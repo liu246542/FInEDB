@@ -4,13 +4,14 @@ import math
 import hashlib
 import hmac
 import json
-import time
+# import time
 from charm.toolbox.symcrypto import SymmetricCryptoAbstraction
 from charm.core.math.integer import randomBits
-from queue import Queue, LifoQueue
+from queue import LifoQueue
 
 
 def gen_key(key_length):
+    # key_length means bits
     assert key_length % 8 == 0
     temp_key = randomBits(key_length)
     return temp_key.to_bytes(int(key_length / 8), byteorder="big")
@@ -20,16 +21,33 @@ def prf_256(key, data):
     if not isinstance(data, bytes):
         data = bytes(data, "utf-8")
     h = hmac.new(key, data, hashlib.sha256)
-    return h.digest()  # output's length is 32, i.e., 32 * 8 = 256
+    return h.digest()  # output's length is 32 bytes, i.e., 32 * 8 = 256
 
 
 def aes_enc(key, plaintext):
     symcrypt = SymmetricCryptoAbstraction(key)
-    # 暂不考虑压缩密文
-    # cryptext = symcrypt.encrypt(plaintext)
-    # CT = json.loads(cryptext)["CipherText"]
-    # IV = json.loads(cryptext)["IV"]
-    return symcrypt.encrypt(plaintext)
+    cryptext = symcrypt.encrypt(plaintext)
+    ct_dict = json.loads(cryptext)
+    ct_dict.pop("ALG")  # Remove unnecessary field
+    ct_dict.pop("MODE")  # Remove unnecessary field
+    cryptext = json.dumps(ct_dict)
+    return cryptext
+
+
+def aes_dec(key, cryptext):
+    if not isinstance(cryptext, str):
+        cryptext = cryptext.decode("utf-8")
+    cryptext = cryptext.strip("0")
+    ct_dict = json.loads(cryptext)
+    symcrypt = SymmetricCryptoAbstraction(key)
+    format_cryptext = {
+        "ALG": 0,
+        "MODE": 2,
+        "IV": ct_dict["IV"],
+        "CipherText": ct_dict["CipherText"]
+    }
+    plaintext = symcrypt.decrypt(json.dumps(format_cryptext))
+    return plaintext
 
 
 def bxor(b1, b2):
@@ -61,69 +79,90 @@ def hash_to_fixsize(bytesize, content):
 
 class BFF(object):
     """docstring for BFF
-
+    Use 3 hash functions map a lable to 3 consecutive segments.
+    So it is faster than XOR Filter to find a singleton.
     """
 
-    def __init__(self):
-        # assert N % 3 == 0
-        # self.segment_range = N / 3
-        # self.N = N
-        self.segment_range = 24 / 3
-        self.N = 24
+    def __init__(self, hash_num=3):
+        # Set default number of hash functions as 3 (i.e., 3-wise)
+        self.hash_num = hash_num
 
-    def __hashfunc__(self, key):
-        # order \gets {b"1", b"2", b"3"}
+    def __hashfunc__(self, key, segment_range):
         pos_list = []
-        for i in range(3):
+        for i in range(self.hash_num):
             pos = hash_to_fixsize(1, key + str(i))
             pos_int = int.from_bytes(pos, byteorder="big")
-            pos_convert = pos_int % self.segment_range + i * self.segment_range
+            pos_convert = pos_int % segment_range + i * segment_range
             pos_list.append(int(pos_convert))
         return pos_list
 
-    def construct(self, dict_data, K_1, K_2, att_list, type_list):
+    def construct(self, dict_data, K_1, K_2, K_J, att_list, type_list):
         temp_dict = {}
         temp_hash = {}
         temp_p2lable = {}
         for i, att in enumerate(att_list):
-            if type_list[i] == "1":
-                # att + "SELECT" => enc(K_1, dict_data[att])
-                label = att + "SELECT"
-                value = bytes(aes_enc(K_1, str(dict_data[att])), "utf-8")
-                assert len(value) == 97
-                value = value.ljust(128, b"0")
-                temp_dict.setdefault(label, value)
+            # All attributes need to append "SELECT"
 
+            # att + "SELECT" => enc(K_1, dict_data[att])
+            label = att + "SELECT"
+            value = bytes(aes_enc(K_1, str(dict_data[att])), "utf-8")
+            # assert len(value) == 97
+            if len(value) > 128:
+                print(dict_data[att])
+                raise RuntimeError(f"Ciphertext is too long ({len(value)} B).")
+            # Padding to 128 Bytes with zeros
+            value = value.ljust(128, b"0")
+            temp_dict.setdefault(label, value)
+
+            if type_list[i] >= 1:
+                # All attributes need to append "WHERE" except for type 0
+
+                # att + "WHERE" => PRF(K_2, dict_data[att])
                 label = att + "WHERE"
                 value = prf_256(K_2, str(dict_data[att]))
                 assert len(value) == 32
+                # Padding to 128 Bytes with zeros
                 value = value.ljust(128, b"0")
                 temp_dict.setdefault(label, value)
 
-        # Choose an appropriate size of BFF
+            if type_list[i] == 3:
+                # For type 3, it also need to append "JOIN"
+
+                # att + "JOIN" => PRF(K_J, dict_data[att])
+                label = att + "JOIN"
+                value = prf_256(K_J, str(dict_data[att]))
+                assert len(value) == 32
+                # Padding to 128 Bytes with zeros
+                value = value.ljust(128, b"0")
+                temp_dict.setdefault(label, value)
+
+        # Set an appropriate size of BFF.
+        # Default number of segments is 3.
+        # The length of each segment is power of 2.
+        # So the choices of segment's length is [4, 8, 16]
         label_num = len(temp_dict.keys())
-        if label_num < 24:
-            self.N = 24
-            self.segment_range = 24 / 3
-        elif label_num < 48:
-            self.N = 48
-            self.segment_range = 48 / 3
+        segment_range = math.ceil(1.2 * label_num / self.hash_num)
+        if segment_range <= 4:
+            segment_range = 4
+        elif segment_range <= 8:
+            segment_range = 8
+        elif segment_range <= 16:
+            segment_range = 16
         else:
             raise RuntimeError("The size is too long to initialize BFF")
+        N = segment_range * self.hash_num  # N is the length of the filter
+        # print(N)
 
         for label in temp_dict.keys():
-            (h1, h2, h3) = self.__hashfunc__(label)
-            temp_hash.setdefault(label, (h1, h2, h3))
-            for h in (h1, h2, h3):
+            hash_tuple = self.__hashfunc__(label, segment_range)
+            temp_hash.setdefault(label, hash_tuple)
+            for h in hash_tuple:
                 temp_p2lable.setdefault(h, [])
                 temp_p2lable[h].append(label)
-            # temp_p2lable.setdefault(h1, [])
-            # temp_p2lable[h1].append(label)
         can_pos = sorted(temp_p2lable.keys())
 
         label_stack = LifoQueue()
         while can_pos != []:
-            # print(list(label_stack.queue))
             prev_len = len(can_pos)
             for pos in can_pos:
                 lab_list = temp_p2lable.get(pos)
@@ -131,7 +170,7 @@ class BFF(object):
                     can_pos.remove(pos)
                 elif len(lab_list) == 1:
                     label = lab_list[0]
-                    label_stack.put(label)
+                    label_stack.put(label)  # Add a singleton to a stack
                     can_pos.remove(pos)
                     for p in temp_hash.get(label):
                         temp_p2lable.get(p).remove(label)
@@ -141,41 +180,33 @@ class BFF(object):
             if prev_len == post_len:
                 raise RuntimeError("Fail to initialize BFF")
 
-        fuse_filter = [0 for i in range(self.N)]
+        fuse_filter = [0 for i in range(N)]  # Initialize a binary fuse filter
 
         for i in range(label_stack.qsize()):
             label = label_stack.get()
-            (p1, p2, p3) = temp_hash.get(label)
-            print((p1, p2, p3))
+            pos_tuple = temp_hash.get(label)
             value = temp_dict.get(label)
             assert len(value) == 128
 
-            # flag = sum([fuse_filter[x] for x in (p1, p2, p3)])
-            # flag = len([p for p in (p1, p2, p3) if fuse_filter[p] == 0])
-            single_pos = [p for p in (p1, p2, p3) if fuse_filter[p] == 0]
-            # dummy_value = []
+            single_pos = [p for p in pos_tuple if fuse_filter[p] == 0]
             xor_value = value
             for i in range(len(single_pos) - 1):
-                # dummy_value.append(gen_key(1024))
-                fuse_filter[single_pos.pop(i)] = gen_key(1024)
-            for p in (p1, p2, p3):
+                fuse_filter[single_pos.pop(0)] = gen_key(1024)
+            for p in pos_tuple:
                 if p not in single_pos:
                     xor_value = bxor(xor_value, fuse_filter[p])
             assert len(single_pos) == 1
             fuse_filter[single_pos[0]] = xor_value
-
-        print(fuse_filter)
-        print(temp_hash)
+        return fuse_filter
 
         # verify correctness
-        test_label = "N_NAMESELECT"
-        (h1, h2, h3) = self.__hashfunc__(test_label)
-        print(h1, h2, h3)
-        rt = bxor(bxor(fuse_filter[h1], fuse_filter[h2]), fuse_filter[h3])
-        vt = temp_dict.get(test_label)
-        print(rt)
-        print(vt)
-        print(rt == vt)
+        # test_label = "L_SUPPKEYSELECT"
+        # (h1, h2, h3) = self.__hashfunc__(test_label)
+        # rt = bxor(bxor(fuse_filter[h1], fuse_filter[h2]), fuse_filter[h3])
+        # vt = temp_dict.get(test_label)
+        # print(aes_dec(K_1, rt))
+        # print(aes_dec(K_1, vt))
+        # print(rt == vt)
 
     def calculate(self, poslist):
         pass
