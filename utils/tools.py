@@ -1,13 +1,76 @@
 #!/usr/bin/python3
 
+import os
 import math
 import hashlib
 import hmac
 import json
+import pandas as pd
 # import time
 from charm.toolbox.symcrypto import SymmetricCryptoAbstraction
 from charm.core.math.integer import randomBits
 from queue import LifoQueue
+
+DB_STRUCTION = {
+    "customer": {
+        "attributes":
+            ['_id', 'C_NAME', 'C_ADDRESS', 'C_NATIONKEY', 'C_PHONE',
+             'C_ACCTBAL', 'MKT_SEGMENT'],
+        "type": [1, 1, 1, 1, 1, 1, 1]
+    },
+    "lineitem": {
+        "attributes":
+            ['L_ORDERKEY', 'L_PARTKEY', 'L_SUPPKEY', 'L_LINENUMBER',
+             'L_QUANTITY', 'L_EXTENDEDPRICE', 'L_DISCOUNT', 'L_TAX',
+             'L_RETURNFLAG', 'L_LINESTATUS', 'L_SHIPDATE', 'L_COMMITDATE',
+             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE'],
+        "type": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                 1, 1, 1, 1, 1]
+    },
+    "nation": {
+        "attributes": ['_id', 'N_NAME', 'N_REGIONKEY'],
+        "type": [1, 1, 1]
+    },
+    "orders": {
+        "attributes":
+            ['_id', 'O_CUSTKEY', 'O_ORDERSTATUS', 'O_TOTALPRICE',
+             'O_ORDERDATE', 'O_ORDERPRIORITY', 'O_CLERK', 'O_SHIPPRIORITY'],
+        "type": [1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "part": {
+        "attributes": ['_id', 'P_NAME', 'P_MFGR', 'P_BRAND', 'P_TYPE',
+                       'P_SIZE', 'P_CONTAINER', 'P_RETAILPRICE'],
+        "type": [1, 1, 1, 1, 1, 1, 1, 1]
+
+    },
+    "partsupp": {
+        "attributes": ['PS_PARTKEY', 'PS_SUPPKEY', 'PS_AVAILQTY',
+                       'PS_SUPPLYCOST'],
+        "type": [1, 1, 1, 1]
+    },
+    "region": {
+        "attributes": ['_id', 'R_NAME'],
+        "type": [1, 1]
+    },
+    "supplier": {
+        "attributes": ['_id', 'S_NAME', 'S_ADDRESS', 'S_NATIONKEY',
+                       'S_PHONE', 'S_ACCTBAL'],
+        "type": [1, 1, 1, 1, 1, 1]
+    }
+}
+
+
+def ParseRawData(folder_name, table_name):
+    file_path = os.path.join(folder_name, table_name + ".tbl")
+    raw_data = pd.read_csv(file_path, sep="|", header=None)
+    # raw_data = raw_data.drop(columns=raw_data.columns[-1])
+    raw_data = raw_data.drop(columns=raw_data.columns[-2:])
+    raw_data.columns = DB_STRUCTION[table_name]["attributes"]
+    attr_type = DB_STRUCTION[table_name]["type"]
+    if "_id" not in raw_data.columns:
+        raw_data["_id"] = range(len(raw_data.index))
+        attr_type.append(1)
+    return (table_name, raw_data, attr_type)
 
 
 def gen_key(key_length):
@@ -90,7 +153,7 @@ class BFF(object):
     def __hashfunc__(self, key, segment_range):
         pos_list = []
         for i in range(self.hash_num):
-            pos = hash_to_fixsize(1, key + str(i))
+            pos = hash_to_fixsize(64, key + str(i))
             pos_int = int.from_bytes(pos, byteorder="big")
             pos_convert = pos_int % segment_range + i * segment_range
             pos_list.append(int(pos_convert))
@@ -142,9 +205,9 @@ class BFF(object):
         # So the choices of segment's length is [4, 8, 16]
         label_num = len(temp_dict.keys())
         segment_range = math.ceil(1.2 * label_num / self.hash_num)
-        if segment_range <= 4:
-            segment_range = 4
-        elif segment_range <= 8:
+        # if segment_range <= 4:
+        # segment_range = 4
+        if segment_range <= 8:
             segment_range = 8
         elif segment_range <= 16:
             segment_range = 16

@@ -2,60 +2,60 @@
 import os
 import pickle
 import pandas as pd
-from utils.tools import gen_key, prf_256, BFF
+from collections import namedtuple
+from utils.tools import gen_key, prf_256, BFF, ParseRawData
 
 
-DB_STRUCTION = {
-    "customer": {
-        "attributes":
-            ['_id', 'C_NAME', 'C_ADDRESS', 'C_NATIONKEY', 'C_PHONE',
-             'C_ACCTBAL', 'MKT_SEGMENT'],
-        "type": [1, 1, 1, 1, 1, 1, 1]
-    },
-    "lineitem": {
-        "attributes":
-            ['L_ORDERKEY', 'L_PARTKEY', 'L_SUPPKEY', 'L_LINENUMBER',
-             'L_QUANTITY', 'L_EXTENDEDPRICE', 'L_DISCOUNT', 'L_TAX',
-             'L_RETURNFLAG', 'L_LINESTATUS', 'L_SHIPDATE', 'L_COMMITDATE',
-             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE'],
-        "type": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1]
-    },
-    "nation": {
-        "attributes": ['_id', 'N_NAME', 'N_REGIONKEY'],
-        "type": [1, 1, 1]
-    },
-    "orders": {
-        "attributes":
-            ['_id', 'O_CUSTKEY', 'O_ORDERSTATUS', 'O_TOTALPRICE',
-             'O_ORDERDATE', 'O_ORDERPRIORITY', 'O_CLERK', 'O_SHIPPRIORITY'],
-        "type": [1, 1, 1, 1, 1, 1, 1, 1]
-    },
-    "part": {
-        "attributes": ['_id', 'P_NAME', 'P_MFGR', 'P_BRAND', 'P_TYPE',
-                       'P_SIZE', 'P_CONTAINER', 'P_RETAILPRICE'],
-        "type": [1, 1, 1, 1, 1, 1, 1, 1]
-
-    },
-    "partsupp": {
-        "attributes": ['PS_PARTKEY', 'PS_SUPPKEY', 'PS_AVAILQTY',
-                       'PS_SUPPLYCOST'],
-        "type": [1, 1, 1, 1]
-    },
-    "region": {
-        "attributes": ['_id', 'R_NAME'],
-        "type": [1, 1]
-    },
-    "supplier": {
-        "attributes": ['_id', 'S_NAME', 'S_ADDRESS', 'S_NATIONKEY',
-                       'S_PHONE', 'S_ACCTBAL'],
-        "type": [1, 1, 1, 1, 1, 1]
-    }
-}
+SecretKey = namedtuple("SecretKey", ["K_T", "K_S", "K_J"])
 
 
 class Client(object):
     """docstring for Client"""
 
     def __init__(self, lamba=256):
-        (K_T, K_e, K_J) = [gen_key(lamba) for i in range(3)]
+        # (K_T, K_e, K_J) = [gen_key(lamba) for i in range(3)]
+        self.SK = SecretKey(*[gen_key(lamba) for i in range(3)])
+
+    def load_tables(self, folder_name, table_name_list):
+        Raw_Tables = []
+        for table_name in table_name_list:
+            Raw_Tables.append(ParseRawData(folder_name, table_name))
+        print("-" * 20 + "LOAD COMPLETE" + "-" * 20)
+        self.Raw_Tables = Raw_Tables
+
+    def construct_index(self):
+        # Raw_Tables => inverted index
+        inverted_index = {}
+        bff = BFF()
+        K_J = self.SK.K_J
+        for table_info in self.Raw_Tables:
+            (t_name, t_data, t_type) = table_info
+            K_e = prf_256(self.SK.K_S, t_name)  # K_1
+            K_v = prf_256(self.SK.K_T, t_name)  # K_2
+            # K_2 = prf_256(self.SK.K_T, t_name)
+            for row in t_data.iterrows():
+                print("|")
+                print(f"Row content:\n {row}")
+                row_dict = row[1].to_dict()
+                for attr in t_data.columns:
+                    if attr == "_id":
+                        label = t_name + attr + str(row_dict[attr])
+                        label = prf_256(self.SK.K_T, label)
+                        value = bff.construct(row_dict, K_e, K_v, K_J,
+                                              t_data.columns, t_type)
+                    else:
+                        label = attr + str(row_dict[attr])
+                        label = prf_256(self.SK.K_T, label)
+                        value = t_name + "_id" + str(row_dict["_id"])
+                    inverted_index.setdefault(label, [])
+                    inverted_index[label].append(value)
+                print("-" * 40)
+
+
+if __name__ == '__main__':
+    ct = Client()
+    # print(ct.SK.K_T)
+    tb_list = ["customer", "lineitem", "nation", "orders",
+               "part", "partsupp", "region", "supplier"]
+    ct.load_tables("../data/sf0.01", tb_list)
+    ct.construct_index()
