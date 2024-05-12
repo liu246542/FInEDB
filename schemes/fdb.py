@@ -23,6 +23,9 @@ class Client(object):
         print("-" * 20 + "LOAD COMPLETE" + "-" * 20)
         self.Raw_Tables = Raw_Tables
 
+    def __index2emm__(self, inverted_index):
+        pass
+
     def construct_index(self):
         # Raw_Tables => inverted index
         inverted_index = {}
@@ -34,8 +37,8 @@ class Client(object):
             K_v = prf_256(self.SK.K_T, t_name)  # K_2
             # K_2 = prf_256(self.SK.K_T, t_name)
             for row in t_data.iterrows():
-                print("|")
-                print(f"Row content:\n {row}")
+                # print("|")
+                # print(f"Row content: \n {row}")
                 row_dict = row[1].to_dict()
                 for attr in t_data.columns:
                     if attr == "_id":
@@ -49,7 +52,8 @@ class Client(object):
                         value = t_name + "_id" + str(row_dict["_id"])
                     inverted_index.setdefault(label, [])
                     inverted_index[label].append(value)
-                print("-" * 40)
+                # print("-" * 40)
+        remm = self.__index2emm__(inverted_index)
 
 
 if __name__ == '__main__':

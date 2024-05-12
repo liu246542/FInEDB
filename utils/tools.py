@@ -204,7 +204,7 @@ class BFF(object):
         # The length of each segment is power of 2.
         # So the choices of segment's length is [4, 8, 16]
         label_num = len(temp_dict.keys())
-        segment_range = math.ceil(1.2 * label_num / self.hash_num)
+        segment_range = math.ceil(1.1 * label_num / self.hash_num)
         # if segment_range <= 4:
         # segment_range = 4
         if segment_range <= 8:
