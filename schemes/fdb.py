@@ -4,6 +4,7 @@ import pickle
 import pandas as pd
 from collections import namedtuple
 from utils.tools import gen_key, prf_256, BFF, ParseRawData
+from utils.REMM import REMM
 
 
 SecretKey = namedtuple("SecretKey", ["K_T", "K_S", "K_J"])
@@ -30,6 +31,7 @@ class Client(object):
         # Raw_Tables => inverted index
         inverted_index = {}
         bff = BFF()
+        remm = REMM()
         K_J = self.SK.K_J
         for table_info in self.Raw_Tables:
             (t_name, t_data, t_type) = table_info
@@ -43,17 +45,20 @@ class Client(object):
                 for attr in t_data.columns:
                     if attr == "_id":
                         label = t_name + attr + str(row_dict[attr])
-                        label = prf_256(self.SK.K_T, label)
+                        # label = prf_256(self.SK.K_T, label)
                         value = bff.construct(row_dict, K_e, K_v, K_J,
                                               t_data.columns, t_type)
                     else:
                         label = attr + str(row_dict[attr])
-                        label = prf_256(self.SK.K_T, label)
+                        # label = prf_256(self.SK.K_T, label)
                         value = t_name + "_id" + str(row_dict["_id"])
                     inverted_index.setdefault(label, [])
                     inverted_index[label].append(value)
                 # print("-" * 40)
-        remm = self.__index2emm__(inverted_index)
+        # remm = self.__index2emm__(inverted_index)
+        remm.setup(inverted_index, self.SK.K_T)
+        with open("./DUMPs/sf0.01/inverted.pkl", "wb") as f:
+            pickle.dump(remm.emm, f)
 
 
 if __name__ == '__main__':
@@ -61,5 +66,6 @@ if __name__ == '__main__':
     # print(ct.SK.K_T)
     tb_list = ["customer", "lineitem", "nation", "orders",
                "part", "partsupp", "region", "supplier"]
-    ct.load_tables("../data/sf0.01", tb_list)
+    # tb_list = ["customer"]
+    ct.load_tables("../data/sf0.001", tb_list)
     ct.construct_index()

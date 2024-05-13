@@ -43,10 +43,11 @@ class REMM(object):
 
                 b_pos = random.choice(free_list[b])
                 free_list[b].remove(b_pos)
+                # print(free_list)
                 self.emm[b][b_pos] = (L, c)
             else:
                 for i, j in enumerate(value):
-                    enc_value = prf_256(K_T, value)
+                    enc_value = prf_256(K_T, j)
                     stag_count = stag + str(i).encode()
                     b = int.from_bytes(hash_to_fixsize(1, stag_count),
                                        byteorder="big")
