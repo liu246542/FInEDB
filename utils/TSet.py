@@ -27,7 +27,7 @@ class TSet(object):
     def setup(self, index_dict, K):
         self.S = self.__count_S__(index_dict, K)
         free_list = [list(range(self.S)) for i in range(self.B)]
-        self.emm = [[(0, 0) for j in range(self.S)] for i in range(self.B)]
+        emm = [[(0, 0) for j in range(self.S)] for i in range(self.B)]
 
         for label in index_dict.keys():
             stag = prf_256(K, label)
@@ -45,4 +45,9 @@ class TSet(object):
                 beta = b"1"
                 if i == len(value) - 1:
                     beta = b"0"
-                c = bxor(mask_k, j)
+                c = bxor(mask_k, beta + j)
+                emm[b][b_pos] = (L, c)
+        return emm
+
+    def gen_token(self, label, K):
+        return prf_256(K, label)

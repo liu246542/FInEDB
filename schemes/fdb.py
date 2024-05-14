@@ -67,5 +67,5 @@ if __name__ == '__main__':
     tb_list = ["customer", "lineitem", "nation", "orders",
                "part", "partsupp", "region", "supplier"]
     # tb_list = ["customer"]
-    ct.load_tables("../data/sf0.001", tb_list)
+    ct.load_tables("../data/sf0.01", tb_list)
     ct.construct_index()

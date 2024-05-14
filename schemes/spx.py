@@ -1,6 +1,9 @@
 #!/usr/bin/python3
+import os
+import pickle
 from collections import namedtuple
-from utils.tools import gen_key, ParseRawData
+from utils.tools import gen_key, ParseRawData, aes_enc
+from utils.TSet import TSet
 
 SecretKey = namedtuple("SecretKey", ["K_1", "K_R", "K_V", "K_C", "K_D", "K_c"])
 
@@ -24,37 +27,49 @@ class Client(object):
         MM_C = {}
         MM_V = {}
         EDX = {}
-        print(self.Raw_Tables)
-        # for series in self.Raw_Tables.items():
-            # print(series)
+        emm = TSet()
+        # print(self.Raw_Tables)
         for table_info in self.Raw_Tables:
             (t_name, t_data, t_type) = table_info
             for attr, column in t_data.items():
                 label_c = t_name + attr
-                MM_C.setdefault(label_c, list(column))
+                enc_column = [bytes(aes_enc(self.SK.K_1, str(x)), "utf-8")
+                              for x in list(column)]
+                # enc_value = aes_enc(self.SK.K_1, value_v)
+                MM_C.setdefault(label_c, enc_column)
             for row in t_data.iterrows():
                 row_dict = row[1].to_dict()
                 value_r = []
                 for attr in t_data.columns:
                     value_str = str(row_dict[attr])
-                    value_r.append(value_str)
+                    enc_value = bytes(aes_enc(self.SK.K_1, value_str), "utf-8")
+                    value_r.append(enc_value)
                     if attr == "_id":
                         label_r = t_name + attr + value_str
                     else:
                         label_v = attr + value_str
                         value_v = t_name + "_id" + str(row_dict["_id"])
+                        rtk_r = emm.gen_token(value_v, self.SK.K_R)
                         MM_V.setdefault(label_v, [])
-                        MM_V[label_v].append(value_v)
+                        MM_V[label_v].append(rtk_r)
                 MM_R.setdefault(label_r, value_r)
         self.MM_R = MM_R
         self.MM_V = MM_V
         self.MM_C = MM_C
+        EMM_R = emm.setup(MM_R, self.SK.K_R)
+        EMM_C = emm.setup(MM_C, self.SK.K_C)
+        EMM_V = emm.setup(MM_V, self.SK.K_V)
+        with open("./DUMPs/spx_r.pkl", "wb") as f:
+            pickle.dump((EMM_R, EMM_C, EMM_V), f)
 
 
 if __name__ == '__main__':
     ct = Client()
-    tb_list = ["customer"]
-    ct.load_tables("../data/sf0.001", tb_list)
+    # tb_list = ["customer"]
+    tb_list = ["customer", "lineitem", "nation", "orders",
+               "part", "partsupp", "region", "supplier"]
+    ct.load_tables("../data/sf0.01", tb_list)
     ct.construct_index()
     # print(ct.MM_R)
-    print(ct.MM_C)
+    # print(ct.MM_C)
+    # print(ct.MM_V)
