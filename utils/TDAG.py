@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-import math
 import pprint
 from tools import ParseRawData
 from collections import namedtuple
@@ -16,7 +15,7 @@ def binstr2int(bin_str):
     return int(bin_str, 2)
 
 
-Node = namedtuple("Node", ["name", "c_node", "p_node", "cv_range"])
+Node = namedtuple("Node", ["name", "c_node", "p_node", "cv_range", "level"])
 
 
 class TDAG(object):
@@ -25,23 +24,25 @@ class TDAG(object):
     """
 
     def __init__(self, max_value):
-        # self.height = math.ceil(math.log(max_value + 1, 2))
         self.height = len(int2binstr(max_value))
 
-    # def __CollectParents__(self, node):
-        # while node.p_node != []:
-            # res_nodes = []
-            # res_nodes.extend(node.p_node)
-            # res_nodes.extend(self.__CollectParents__())
+    def __CollectParents__(self, node, node_dict):
+        if node.p_node != []:
+            res_nodes = set(node.p_node)
+            for p in node.p_node:
+                temp_nodes = self.__CollectParents__(node_dict.get(p),
+                                                     node_dict)
+                res_nodes = res_nodes.union(set(temp_nodes))
+            return res_nodes
+        else:
+            return set()
 
-    def construct(self, value_list):
+    def construct(self, value_list, recursive=0):
         # return a list contains a set of nodes
         value_set = sorted(set(value_list))
-        # print(value_set)
         Tree_Nodes = {}
         print(self.height)
         for i in range(self.height, -1, -1):
-            # level_nodes = {}
             level_nodes = []
             for j in range(2 ** i):
                 name = int2binstr(j).rjust(i, "0")
@@ -56,16 +57,13 @@ class TDAG(object):
                 if i == 0:
                     name = "root"
                     parent_node = []
+                    child_nodes = ["0", "1"]
                     cover_range = [0, 2 ** self.height - 1]
                 if i == 1:
                     parent_node = ["root"]
-                node_def = Node(name, child_nodes, parent_node, cover_range)
-                # Tree_Nodes.append(node_def)
+                node_def = Node(name, child_nodes, parent_node, cover_range, i)
                 level_nodes.append(node_def)
-                # level_nodes.setdefault(name, node_def)
-                # Tree_Nodes.setdefault(name, node_def)
             Tree_Nodes.setdefault(i, level_nodes)
-        # print(Tree_Nodes.get(0))
         # pprint.pprint(Tree_Nodes)
 
         for i in range(1, self.height):
@@ -78,14 +76,13 @@ class TDAG(object):
                                node_list[j + 1].c_node[0]]
                 cover_range = [node_list[j].cv_range[1],
                                node_list[j + 1].cv_range[0]]
-                node_def = Node(name, child_nodes, [], cover_range)
+                node_def = Node(name, child_nodes, [], cover_range, i)
                 level_nodes.append(node_def)
 
                 node_list_next = Tree_Nodes.get(i + 1)
                 node_list_next[2 * j + 1].p_node.append(name)
                 node_list_next[2 * j + 2].p_node.append(name)
             Tree_Nodes[i].extend(level_nodes)
-            # DAG_Nodes.setdefault(i, level_nodes)
         # pprint.pprint(Tree_Nodes)
 
         Node_Dict = {}
@@ -93,49 +90,25 @@ class TDAG(object):
         for level in Tree_Nodes.keys():
             for i in Tree_Nodes.get(level):
                 Node_Dict.setdefault(i.name, i)
-        # pprint.pprint(Node_Dict)
-        print(len(Node_Dict.keys()))
 
-        Nece_Maps = {}
+        Multi_Maps = {}
 
         for value in value_set:
             name_index = int2binstr(value).rjust(self.height, "0")
-            # for pnode in Node_Dict.get(name_index).p_node:
-                #
-
-            pprint.pprint(Node_Dict.get(name_index))
-        # pprint.pprint(value_set)
-
-        # for i in range(self.height + 1):
-            # print(Tree_Nodes.get(i))
-        """
-        for i in range(self.height, -1, -1):
-            print(i)
-            if i == self.height:
-                # leaf nodes
-                leaf_nodes = [int2binstr(x).rjust(self.height, "0")
-                              for x in value_set]
-                Tree_Nodes.setdefault(i, leaf_nodes)
+            leaf_node = Node_Dict.get(name_index)
+            parent_node = list(self.__CollectParents__(leaf_node, Node_Dict))
+            if recursive:
+                Multi_Maps.setdefault(name_index, [value])
+                for label in parent_node:
+                    Multi_Maps.setdefault(label, Node_Dict.get(label).c_node)
+                # return Multi_Maps
             else:
-                pass
-        """
-
-        """
-        for i in range(self.height, -1, -1):
-            level_nodes = []
-            if i == 0:
-                # level_nodes.append("root")
-                node = Node("root", ["0", "1"], [], [0, 2 ** self.height - 1])
-                level_nodes.append(node)
-            else:
-                for j in range(2 ** i):
-                    node_bin = int2binstr(j).rjust(i, "0")
-                    level_nodes.append(node_bin)
-            Tree_Nodes.append(level_nodes)
-        # print(len(Tree_Nodes))
-        print(Tree_Nodes[-3:])
-        """
-        return value_set
+                parent_node.append(name_index)
+                for label in parent_node:
+                    Multi_Maps.setdefault(label, [])
+                    Multi_Maps.get(label).append(value)
+        pprint.pprint(Multi_Maps)
+        return Multi_Maps
 
 
 if __name__ == '__main__':
@@ -145,4 +118,4 @@ if __name__ == '__main__':
     print(max_value)
     # max_value = max(list(t_data["O_CUSTKEY"]))
     tdag = TDAG(max_value)
-    tdag.construct(list(t_data["_id"]))
+    tdag.construct(list(t_data["_id"]), 1)
