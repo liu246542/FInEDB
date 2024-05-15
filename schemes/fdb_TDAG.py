@@ -4,7 +4,7 @@ import pickle
 from collections import namedtuple
 from utils.tools import gen_key, prf_256, BFF, ParseRawData
 from utils.REMM import REMM
-from utils import pysize
+from utils import pysize, TDAG
 
 
 SecretKey = namedtuple("SecretKey", ["K_T", "K_S", "K_J"])
@@ -35,6 +35,29 @@ class Client(object):
         K_J = self.SK.K_J
         for table_info in self.Raw_Tables:
             (t_name, t_data, t_type) = table_info
+
+            Node_Index = {}
+
+            for i, t in enumerate(t_type):
+                if t == 2:
+                    attr = t_data.columns[i]
+                    # print(attr)
+                    value_list = list(t_data[attr])
+
+                    max_value = max(value_list)
+                    tdag = TDAG.TDAG(max_value)
+                    (MM_range, node_dict) = tdag.construct(value_list)
+
+                    for node_name in MM_range.keys():
+                        v_list = MM_range.get(node_name)
+
+                        label = t_name + attr + node_name
+                        value = [t_name + attr + str(x) for x in v_list]
+
+                        inverted_index.setdefault(label, value)
+
+                    Node_Index.setdefault(attr, (node_dict, max_value))
+
             K_e = prf_256(self.SK.K_S, t_name)  # K_1
             K_v = prf_256(self.SK.K_T, t_name)  # K_2
             for row in t_data.iterrows():
@@ -44,7 +67,8 @@ class Client(object):
                         label = t_name + attr + str(row_dict[attr])
                         # label = prf_256(self.SK.K_T, label)
                         value = bff.construct(row_dict, K_e, K_v, K_J,
-                                              t_data.columns, t_type)
+                                              t_data.columns, t_type,
+                                              Node_Index)
                     else:
                         label = attr + str(row_dict[attr])
                         # label = prf_256(self.SK.K_T, label)
@@ -60,10 +84,10 @@ class Client(object):
 if __name__ == '__main__':
     ct = Client()
     # print(ct.SK.K_T)
-    tb_list = ["customer", "lineitem", "nation", "orders",
-               "part", "partsupp", "region", "supplier"]
-    # tb_list = ["customer"]
-    ct.load_tables("../data/sf0.01", tb_list)
+    # tb_list = ["customer", "lineitem", "nation", "orders",
+               # "part", "partsupp", "region", "supplier"]
+    tb_list = ["lineitem"]
+    ct.load_tables("../data/sf0.001", tb_list)
     emm = ct.construct_index()
-    print(pysize.get_size(emm))
+    # print(pysize.get_size(emm))
     print(len(pickle.dumps(emm, -1)))

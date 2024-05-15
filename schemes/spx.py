@@ -1,9 +1,10 @@
 #!/usr/bin/python3
-import os
+
 import pickle
 from collections import namedtuple
 from utils.tools import gen_key, ParseRawData, aes_enc
 from utils.TSet import TSet
+from utils import pysize
 
 SecretKey = namedtuple("SecretKey", ["K_1", "K_R", "K_V", "K_C", "K_D", "K_c"])
 
@@ -11,14 +12,18 @@ SecretKey = namedtuple("SecretKey", ["K_1", "K_R", "K_V", "K_C", "K_D", "K_c"])
 class Client(object):
     """docstring for Client"""
 
-    def __init__(self, lamba=256):
+    def __init__(self, lamba=256, SK=None):
         # (K_1, K_R, K_V, K_C, K_D)
-        self.SK = SecretKey(*[gen_key(lamba) for i in range(5)], [])
+        if SK is None:
+            self.SK = SecretKey(*[gen_key(lamba) for i in range(5)], [])
+        else:
+            self.SK = SK
 
     def load_tables(self, folder_name, table_name_list):
         Raw_Tables = []
         for table_name in table_name_list:
             Raw_Tables.append(ParseRawData(folder_name, table_name))
+        print("-" * 20 + "LOAD COMPLETE" + "-" * 20)
         self.Raw_Tables = Raw_Tables
 
     def construct_index(self):
@@ -27,8 +32,7 @@ class Client(object):
         MM_C = {}
         MM_V = {}
         EDX = {}
-        emm = TSet()
-        # print(self.Raw_Tables)
+        STE = TSet()
         for table_info in self.Raw_Tables:
             (t_name, t_data, t_type) = table_info
             for attr, column in t_data.items():
@@ -49,18 +53,19 @@ class Client(object):
                     else:
                         label_v = attr + value_str
                         value_v = t_name + "_id" + str(row_dict["_id"])
-                        rtk_r = emm.gen_token(value_v, self.SK.K_R)
+                        rtk_r = STE.gen_token(value_v, self.SK.K_R)
                         MM_V.setdefault(label_v, [])
                         MM_V[label_v].append(rtk_r)
                 MM_R.setdefault(label_r, value_r)
-        self.MM_R = MM_R
-        self.MM_V = MM_V
-        self.MM_C = MM_C
-        EMM_R = emm.setup(MM_R, self.SK.K_R)
-        EMM_C = emm.setup(MM_C, self.SK.K_C)
-        EMM_V = emm.setup(MM_V, self.SK.K_V)
-        with open("./DUMPs/spx_r.pkl", "wb") as f:
-            pickle.dump((EMM_R, EMM_C, EMM_V), f)
+        # self.MM_R = MM_R
+        # self.MM_V = MM_V
+        # self.MM_C = MM_C
+        EMM_R = STE.setup(MM_R, self.SK.K_R)
+        EMM_C = STE.setup(MM_C, self.SK.K_C)
+        EMM_V = STE.setup(MM_V, self.SK.K_V)
+        return (EMM_R, EMM_C, EMM_V, EDX)
+        # with open("./DUMPs/spx_r.pkl", "wb") as f:
+            # pickle.dump((EMM_R, EMM_C, EMM_V), f)
 
 
 if __name__ == '__main__':
@@ -69,7 +74,9 @@ if __name__ == '__main__':
     tb_list = ["customer", "lineitem", "nation", "orders",
                "part", "partsupp", "region", "supplier"]
     ct.load_tables("../data/sf0.01", tb_list)
-    ct.construct_index()
+    ALL_EMM = ct.construct_index()
+    print(pysize.get_size(ALL_EMM))
+    print(len(pickle.dumps(ALL_EMM, -1)))
     # print(ct.MM_R)
     # print(ct.MM_C)
     # print(ct.MM_V)

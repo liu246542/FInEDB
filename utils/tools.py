@@ -7,6 +7,7 @@ import hmac
 import json
 import pandas as pd
 # import time
+from .TDAG import TDAG
 from charm.toolbox.symcrypto import SymmetricCryptoAbstraction
 from charm.core.math.integer import randomBits
 from queue import LifoQueue
@@ -24,7 +25,7 @@ DB_STRUCTION = {
              'L_QUANTITY', 'L_EXTENDEDPRICE', 'L_DISCOUNT', 'L_TAX',
              'L_RETURNFLAG', 'L_LINESTATUS', 'L_SHIPDATE', 'L_COMMITDATE',
              'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE'],
-        "type": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        "type": [2, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                  1, 1, 1, 1, 1]
     },
     "nation": {
@@ -153,13 +154,14 @@ class BFF(object):
     def __hashfunc__(self, key, segment_range):
         pos_list = []
         for i in range(self.hash_num):
-            pos = hash_to_fixsize(64, key + str(i))
+            pos = hash_to_fixsize(1, key + str(i))
             pos_int = int.from_bytes(pos, byteorder="big")
             pos_convert = pos_int % segment_range + i * segment_range
             pos_list.append(int(pos_convert))
         return pos_list
 
-    def construct(self, dict_data, K_1, K_2, K_J, att_list, type_list):
+    def construct(self, dict_data, K_1, K_2, K_J,
+                  att_list, type_list, Node_Index):
         temp_dict = {}
         temp_hash = {}
         temp_p2lable = {}
@@ -188,6 +190,16 @@ class BFF(object):
                 value = value.ljust(128, b"0")
                 temp_dict.setdefault(label, value)
 
+            if type_list[i] == 2:
+                node_dict, max_value = Node_Index.get(att)
+                tdag = TDAG(max_value)
+                node_set = tdag.__CollectParents__(dict_data[att], node_dict)
+                for n in list(node_set):
+                    label = att + n + "WHERE"
+                    value = prf_256(K_2, n)
+                    value = value.ljust(128, b"0")
+                    temp_dict.setdefault(label, value)
+
             if type_list[i] == 3:
                 # For type 3, it also need to append "JOIN"
 
@@ -211,8 +223,10 @@ class BFF(object):
             segment_range = 8
         elif segment_range <= 16:
             segment_range = 16
+        elif segment_range <= 64:
+            segment_range = 64
         else:
-            raise RuntimeError("The size is too long to initialize BFF")
+            raise RuntimeError(f"The size {label_num} is too long to initialize BFF")
         N = segment_range * self.hash_num  # N is the length of the filter
         # print(N)
 

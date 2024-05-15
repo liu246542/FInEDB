@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import pprint
-from tools import ParseRawData
+# from tools import ParseRawData
 from collections import namedtuple
 
 
@@ -27,6 +27,8 @@ class TDAG(object):
         self.height = len(int2binstr(max_value))
 
     def __CollectParents__(self, node, node_dict):
+        if isinstance(node, int):
+            node = node_dict.get(int2binstr(node).rjust(self.height, "0"))
         if node.p_node != []:
             res_nodes = set(node.p_node)
             for p in node.p_node:
@@ -107,15 +109,21 @@ class TDAG(object):
                 for label in parent_node:
                     Multi_Maps.setdefault(label, [])
                     Multi_Maps.get(label).append(value)
-        pprint.pprint(Multi_Maps)
-        return Multi_Maps
+        # pprint.pprint(len(Multi_Maps.keys()))
+        # pprint.pprint(Multi_Maps)
+        return (Multi_Maps, Node_Dict)
 
 
 if __name__ == '__main__':
+    # Raw_Data = ParseRawData("../data/sf0.01", "orders")
     Raw_Data = ParseRawData("../data/sf0.01", "nation")
     (t_name, t_data, t_type) = Raw_Data
+    # max_value = max(list(t_data["O_CUSTKEY"]))
     max_value = max(list(t_data["_id"]))
     print(max_value)
     # max_value = max(list(t_data["O_CUSTKEY"]))
     tdag = TDAG(max_value)
+    # print(len(list(t_data["O_CUSTKEY"])))
+    # print(f"value length:{len(list(t_data["O_CUSTKEY"]))}")
+    # tdag.construct(list(t_data["O_CUSTKEY"]), 1)
     tdag.construct(list(t_data["_id"]), 1)

@@ -16,8 +16,7 @@ class TSet(object):
         pos_record = {}
         for label in index_dict.keys():
             stag = prf_256(K, label)
-            # print(type(stag))
-            for i, j in enumerate(index_dict.get(label)):
+            for i, _ in enumerate(index_dict.get(label)):
                 pos_b = hash_to_fixsize(1, stag + str(i).encode())
                 counter = pos_record.setdefault(pos_b, 0)
                 counter += 1
