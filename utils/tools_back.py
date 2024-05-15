@@ -147,28 +147,32 @@ class BFF(object):
     So it is faster than XOR Filter to find a singleton.
     """
 
-    def __init__(self, hash_num=3, segment_range=8):
+    def __init__(self, hash_num=4, K_H=None):
         # Set default number of hash functions as 3 (i.e., 3-wise)
         self.hash_num = hash_num
-        self.segment_range = segment_range
-        # self.segment_num = segment_num
+        if K_H is None:
+            self.K_H = gen_key(256)
+        else:
+            self.K_H = K_H
 
-    def __hashfunc__(self, key, segment_num):
+    def __hashfunc__(self, key, segment_range):
         pos_list = []
-        segment_pos = int.from_bytes(hash_to_fixsize(1, key),
-                                     byteorder="big")
-        segment_pos = segment_pos % segment_num
-
         for i in range(self.hash_num):
-            pos = hash_to_fixsize(64, key + str(i))
+            pos = hash_to_fixsize(1, key + str(i))
             pos_int = int.from_bytes(pos, byteorder="big")
-            pos_1 = int(pos_int % self.segment_range)
-            pos_2 = int((segment_pos + i) % segment_num)
-            pos_convert = pos_2 * self.segment_range + pos_1
-            # + i * segment_range
-            # pos_convert = pos_int % (self.hash_num * segment_range)
+            # pos_convert = pos_int % segment_range + i * segment_range
+            pos_convert = pos_int % (self.hash_num * segment_range)
             pos_list.append(int(pos_convert))
-        # print(pos_list)
+        return pos_list
+
+    def __hashfunc2__(self, key, segment_range):
+        pos_list = []
+        for i in range(self.hash_num):
+            # pos = hash_to_fixsize(2, key + str(i))
+            pos = prf_256(self.K_H, key + str(i))
+            pos_int = int.from_bytes(pos, byteorder="big")
+            pos_convert = pos_int % segment_range + i * segment_range
+            pos_list.append(int(pos_convert))
         return pos_list
 
     def construct(self, dict_data, K_1, K_2, K_J,
@@ -206,7 +210,7 @@ class BFF(object):
                 tdag = TDAG(max_value)
                 node_set = tdag.__CollectParents__(dict_data[att], node_dict)
                 for n in list(node_set):
-                    label = n + "WHERE"
+                    label = att + n + "WHERE"
                     value = prf_256(K_2, n)
                     value = value.ljust(128, b"0")
                     temp_dict.setdefault(label, value)
@@ -227,28 +231,22 @@ class BFF(object):
         # The length of each segment is power of 2.
         # So the choices of segment's length is [4, 8, 16]
         label_num = len(temp_dict.keys())
-        segment_num = math.ceil(3 * label_num / self.segment_range)
-        # print(f"-----------{segment_num}")
-        # segment_range = math.ceil(1.1 * label_num / self.segment_num)
-        # segment_range = math.ceil(1.5 * label_num / self.hash_num)
-        # if segment_range <= 4:
-            # segment_range = 4
-        # if segment_range <= 8:
-            # segment_range = 8
-        # elif segment_range <= 16:
-            # segment_range = 16
-        # elif segment_range <= 24:
-            # segment_range = 24
-        # else:
-            # raise RuntimeError(f"The size {label_num} is too long to initialize BFF")
-        # N = segment_range * self.hash_num  # N is the length of the filter
-        # N = self.segment_range * segment_num
-        N = self.segment_range * segment_num
+        segment_range = math.ceil(1.5 * label_num / self.hash_num)
+        if segment_range <= 4:
+            segment_range = 4
+        if segment_range <= 8:
+            segment_range = 8
+        elif segment_range <= 16:
+            segment_range = 16
+        elif segment_range <= 24:
+            segment_range = 24
+        else:
+            raise RuntimeError(f"The size {label_num} is too long to initialize BFF")
+        N = segment_range * self.hash_num  # N is the length of the filter
         # print(N)
 
         for label in temp_dict.keys():
-            hash_tuple = self.__hashfunc__(label, segment_num)
-            # hash_tuple = self.__hashfunc__(label, segment_range)
+            hash_tuple = self.__hashfunc__(label, segment_range)
             temp_hash.setdefault(label, hash_tuple)
             for h in hash_tuple:
                 temp_p2lable.setdefault(h, [])
@@ -274,9 +272,7 @@ class BFF(object):
             post_len = len(can_pos)
             if prev_len == post_len:
                 print(label_num)
-                # print(segment_range * self.hash_num)
-                print(N)
-                print(temp_dict.keys())
+                print(segment_range * self.hash_num)
                 # print(can_pos)
                 # print([temp_p2lable.get(x) for x in can_pos])
                 # print(temp_p2lable.get(can_pos[0]))
@@ -308,7 +304,6 @@ class BFF(object):
                     xor_value = bxor(xor_value, fuse_filter[p])
             assert len(single_pos) == 1
             fuse_filter[single_pos[0]] = xor_value
-        print("Done!")
         return fuse_filter
 
         # verify correctness
