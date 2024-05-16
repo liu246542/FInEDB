@@ -32,8 +32,8 @@ class Client(object):
         for table_info in self.Raw_Tables:
             (t_name, t_data, t_type) = table_info
             for i, t in enumerate(t_type):
-                # if t == 2:
-                if t_data.columns[i] == "O_CUSTKEY":
+                if t == 2:
+                # if t_data.columns[i] == "O_CUSTKEY":
                     attr = t_data.columns[i]
                     value_list = list(t_data[attr])
                     row_list = list(t_data["_id"])
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     # tb_list = ["customer"]
     # tb_list = ["customer", "lineitem", "nation", "orders",
                # "part", "partsupp", "region", "supplier"]
-    tb_list = ["orders"]
+    tb_list = ["lineitem"]
     ct.load_tables("../data/sf0.01", tb_list)
     ALL_EMM = ct.construct_index()
     print(pysize.get_size(ALL_EMM))

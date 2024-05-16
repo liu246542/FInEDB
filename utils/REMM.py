@@ -47,6 +47,11 @@ class REMM(object):
                 emm[b][b_pos] = (L, c)
             else:
                 for i, j in enumerate(value):
+                    # assert isinstance(j, str)
+                    # print(type(j))
+                    # print(i)
+                    # print(label)
+                    # print(value[0:3])
                     enc_value = prf_256(K_T, j)
                     stag_count = stag + str(i).encode()
                     b = int.from_bytes(hash_to_fixsize(1, stag_count),

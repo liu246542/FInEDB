@@ -53,6 +53,7 @@ class TDAG(object):
                 cover_range = [binstr2int(x) for x in
                                [name.ljust(self.height, "0"),
                                 name.ljust(self.height, "1")]]
+                # c_name = f"N_({cover_range[0]}, {cover_range[1]})"
                 if i == self.height:
                     child_nodes = []
                     cover_range = [cover_range[0]]
@@ -61,9 +62,11 @@ class TDAG(object):
                     parent_node = []
                     child_nodes = ["0", "1"]
                     cover_range = [0, 2 ** self.height - 1]
+                    # c_name = "root"
                 if i == 1:
                     parent_node = ["root"]
                 node_def = Node(name, child_nodes, parent_node, cover_range, i)
+                # node_def = Node(c_name, child_nodes, parent_node, cover_range, i)
                 level_nodes.append(node_def)
             Tree_Nodes.setdefault(i, level_nodes)
         # pprint.pprint(Tree_Nodes)

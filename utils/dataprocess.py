@@ -18,7 +18,7 @@ DB_STRUCTION = {
              'L_QUANTITY', 'L_EXTENDEDPRICE', 'L_DISCOUNT', 'L_TAX',
              'L_RETURNFLAG', 'L_LINESTATUS', 'L_SHIPDATE', 'L_COMMITDATE',
              'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE'],
-        "type": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        "type": [2, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                  1, 1, 1, 1, 1]
     },
     "nation": {
