@@ -172,7 +172,7 @@ class BFF(object):
         pos_list = []
         segment_pos = int.from_bytes(hash_to_fixsize(1, key),
                                      byteorder="big")
-        segment_pos = segment_pos % segment_num
+        segment_pos = segment_pos % (segment_num - self.hash_num + 1)
 
         for i in range(self.hash_num):
             pos = hash_to_fixsize(1, key + str(i))
