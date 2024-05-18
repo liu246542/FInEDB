@@ -43,7 +43,7 @@ class TDAG(object):
         # return a list contains a set of nodes
         value_set = sorted(set(value_list))
         Tree_Nodes = {}
-        print(self.height)
+        print(f"Tree Height is {self.height}")
         for i in range(self.height, -1, -1):
             level_nodes = []
             for j in range(2 ** i):

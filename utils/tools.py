@@ -43,6 +43,15 @@ DB_STRUCTION = {
         "type": [2, 2, 2, 2, 2, 1, 1, 1, 1, 1,
                  1, 1, 1, 1, 1]
     },
+    "lineitem_join": {
+        "attributes":
+            ['L_ORDERKEY', 'L_PARTKEY', 'L_SUPPKEY', 'L_LINENUMBER',
+             'L_QUANTITY', 'L_EXTENDEDPRICE', 'L_DISCOUNT', 'L_TAX',
+             'L_RETURNFLAG', 'L_LINESTATUS', 'L_SHIPDATE', 'L_COMMITDATE',
+             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE'],
+        "type": [3, 3, 3, 1, 1, 1, 1, 1, 1, 1,
+                 1, 1, 1, 1, 1]
+    },
     "nation": {
         "attributes": ['_id', 'N_NAME', 'N_REGIONKEY'],
         "type": [1, 1, 1]
@@ -162,24 +171,25 @@ class BFF(object):
     So it is faster than XOR Filter to find a singleton.
     """
 
-    def __init__(self, hash_num=4, segment_range=16):
+    def __init__(self, hash_num=3):
         # Set default number of hash functions as 3 (i.e., 3-wise)
         self.hash_num = hash_num
-        self.segment_range = segment_range
+        # self.segment_range = segment_range
         # self.segment_num = segment_num
+        self.nonce = str(gen_key(32))
 
-    def __hashfunc__(self, key, segment_num):
+    def __hashfunc__(self, key, segment_num, segment_range):
         pos_list = []
         segment_pos = int.from_bytes(hash_to_fixsize(1, key),
                                      byteorder="big")
         segment_pos = segment_pos % (segment_num - self.hash_num + 1)
 
         for i in range(self.hash_num):
-            pos = hash_to_fixsize(1, key + str(i))
+            pos = hash_to_fixsize(1, key + self.nonce + str(i))
             pos_int = int.from_bytes(pos, byteorder="big")
-            pos_1 = int(pos_int % self.segment_range)
+            pos_1 = int(pos_int % segment_range)
             pos_2 = int((segment_pos + i) % segment_num)
-            pos_convert = pos_2 * self.segment_range + pos_1
+            pos_convert = pos_2 * segment_range + pos_1
             # + i * segment_range
             # pos_convert = pos_int % (self.hash_num * segment_range)
             pos_list.append(int(pos_convert))
@@ -187,16 +197,18 @@ class BFF(object):
         return pos_list
 
     def construct(self, dict_data, K_1, K_2, K_J,
-                  att_list, type_list, Node_Index):
+                  K_T, att_list, type_list, Node_Index):
         temp_dict = {}
         temp_hash = {}
         temp_p2lable = {}
+        temp_inverted_index = {}
         for i, att in enumerate(att_list):
             # All attributes need to append "SELECT"
 
             # att + "SELECT" => enc(K_1, dict_data[att])
             label = att + "SELECT"
-            # label = str(prf_256(K_2, label))
+            label = str(prf_256(K_2, label))
+            """
             value = bytes(aes_enc(K_1, str(dict_data[att])), "utf-8")
             # assert len(value) == 97
             if len(value) > 128:
@@ -204,6 +216,15 @@ class BFF(object):
                 raise RuntimeError(f"Ciphertext is too long ({len(value)} B).")
             # Padding to 128 Bytes with zeros
             value = value.ljust(128, b"0")
+            """
+
+            label_prime = gen_key(32)
+            value_prime = bytes(aes_enc(K_1, str(dict_data[att])), "utf-8")
+            temp_inverted_index.setdefault(label_prime, [value_prime])
+
+            value = prf_256(K_T, label_prime)
+            # value = prf_256(K_2, "1")
+            assert len(value) == 32
             temp_dict.setdefault(label, value)
 
             if type_list[i] >= 1:
@@ -211,26 +232,28 @@ class BFF(object):
 
                 # att + "WHERE" => PRF(K_2, dict_data[att])
                 label = att + "WHERE"
-                # label = str(prf_256(K_2, label))
+                label = str(prf_256(K_2, label))
                 value = prf_256(K_2, str(dict_data[att]))
                 assert len(value) == 32
                 # Padding to 128 Bytes with zeros
-                value = value.ljust(128, b"0")
+                # value = value.ljust(128, b"0")
                 temp_dict.setdefault(label, value)
 
             if type_list[i] == 2:
-                pass
-                """
+                # pass
+                # """
                 node_dict, max_value = Node_Index.get(att)
                 tdag = TDAG(max_value)
                 node_set = tdag.__CollectParents__(dict_data[att], node_dict)
                 for n in list(node_set):
-                    label = att + "node" + n
+                    label = n + att + "node"
+                    # label = str(prf_256(K_2, gen_key(1024)))
                     label = str(prf_256(K_2, label))
                     value = prf_256(K_2, n)
-                    value = value.ljust(128, b"0")
+                    assert len(value) == 32
+                    # value = value.ljust(128, b"0")
                     temp_dict.setdefault(label, value)
-                """
+                # """
 
             if type_list[i] == 3:
                 # For type 3, it also need to append "JOIN"
@@ -240,7 +263,7 @@ class BFF(object):
                 value = prf_256(K_J, str(dict_data[att]))
                 assert len(value) == 32
                 # Padding to 128 Bytes with zeros
-                value = value.ljust(128, b"0")
+                # value = value.ljust(128, b"0")
                 temp_dict.setdefault(label, value)
 
         # Set an appropriate size of BFF.
@@ -248,27 +271,28 @@ class BFF(object):
         # The length of each segment is power of 2.
         # So the choices of segment's length is [4, 8, 16]
         label_num = len(temp_dict.keys())
-        segment_num = math.ceil(1.2 * label_num / self.segment_range)
+        # segment_range = 2 ** (math.floor(math.log(label_num, 3.33) + 2.25))
+        segment_range = math.ceil(4.8 * (label_num ** 0.58))
+        # segment_range = math.ceil(0.7 * (label_num ** 0.65))
+        # segment_range = 16
+        # segment_num = math.ceil(1.075 * label_num / segment_range)
+        # segment_num = math.ceil(1.125 * label_num / segment_range)
+        segment_num = math.ceil(1.125 * label_num / segment_range)
+        if segment_num < self.hash_num:
+            segment_num = self.hash_num
+
+        # segment_num = math.ceil(1.2 * label_num / self.segment_range)
         # print(f"-----------{segment_num}")
         # segment_range = math.ceil(1.1 * label_num / self.segment_num)
         # segment_range = math.ceil(1.5 * label_num / self.hash_num)
-        # if segment_range <= 4:
-            # segment_range = 4
-        # if segment_range <= 8:
-            # segment_range = 8
-        # elif segment_range <= 16:
-            # segment_range = 16
-        # elif segment_range <= 24:
-            # segment_range = 24
-        # else:
-            # raise RuntimeError(f"The size {label_num} is too long to initialize BFF")
-        # N = segment_range * self.hash_num  # N is the length of the filter
-        # N = self.segment_range * segment_num
-        N = self.segment_range * segment_num
-        # print(N)
+        N = segment_range * segment_num  # N is the length of the filter
+
+        # print(f"segment range is {segment_range}")
+        # print(f"segment number is {segment_num}")
+        # print(f"total element num is {label_num}")
 
         for label in temp_dict.keys():
-            hash_tuple = self.__hashfunc__(label, segment_num)
+            hash_tuple = self.__hashfunc__(label, segment_num, segment_range)
             # hash_tuple = self.__hashfunc__(label, segment_range)
             temp_hash.setdefault(label, hash_tuple)
             for h in hash_tuple:
@@ -294,24 +318,26 @@ class BFF(object):
                     continue
             post_len = len(can_pos)
             if prev_len == post_len:
-                print(label_num)
+                print(f"segment range is {segment_range}")
+                print(f"segment number is {segment_num}")
+                print(f"total element num is {label_num}")
+                # print(len(temp_dict.keys()))
+                # print(len(set(temp_dict.keys())))
+                # print(label_num)
                 # print(segment_range * self.hash_num)
-                print(N)
-                print(temp_dict.keys())
-                print(dict_data.get("_id"))
-                # print(can_pos)
-                # print([temp_p2lable.get(x) for x in can_pos])
+                # print(N)
+                # print(temp_dict.keys())
+                # print(dict_data.get("_id"))
+                print(can_pos)
+                print([len(temp_p2lable.get(x)) for x in can_pos])
                 # print(temp_p2lable.get(can_pos[0]))
                 # x = [temp_p2lable.get(x) for x in can_pos]
-                # y = []
-                # for i in x:
-                    # y.extend(i)
-                # print(set(y))
+                # print(x)
                 # error_pos = temp_p2lable.get(can_pos[0])
                 # print(self.__hashfunc__(error_pos[0], segment_range))
                 # print(self.__hashfunc__(error_pos[1], segment_range))
-
-                raise RuntimeError("Fail to initialize BFF")
+                # raise RuntimeError("Fail to initialize BFF")
+                return (0, [], {})
 
         fuse_filter = [0 for i in range(N)]  # Initialize a binary fuse filter
 
@@ -319,19 +345,22 @@ class BFF(object):
             label = label_stack.get()
             pos_tuple = temp_hash.get(label)
             value = temp_dict.get(label)
-            assert len(value) == 128
+            # assert len(value) == 128
+            assert len(value) == 32
 
             single_pos = [p for p in pos_tuple if fuse_filter[p] == 0]
             xor_value = value
             for i in range(len(single_pos) - 1):
-                fuse_filter[single_pos.pop(0)] = gen_key(1024)
+                # fuse_filter[single_pos.pop(0)] = gen_key(1024)
+                fuse_filter[single_pos.pop(0)] = gen_key(256)
             for p in pos_tuple:
                 if p not in single_pos:
                     xor_value = bxor(xor_value, fuse_filter[p])
             assert len(single_pos) == 1
             fuse_filter[single_pos[0]] = xor_value
         # print("Done!")
-        return fuse_filter
+        # return fuse_filter
+        return [1, fuse_filter, temp_inverted_index]
 
         # verify correctness
         # test_label = "L_SUPPKEYSELECT"

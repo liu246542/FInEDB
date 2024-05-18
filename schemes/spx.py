@@ -65,6 +65,18 @@ class Client(object):
                                 value.append(rtk)
                         mm_tdag.setdefault(label, value)
                     MM_V.update(mm_tdag)
+
+                if t == 3:
+                    temp_mm_c = {}
+                    attr = t_data.columns[i]
+                    value_list = list(t_data[attr])
+                    row_list = list(t_data["_id"])
+                    for i, value in enumerate(value_list):
+                        label_c = value
+                        value_c = t_name + attr + row_list[i]
+                        temp_mm_c.setdefault(label_c, [])
+                        temp_mm_c[label_c].append(value_c)
+                    EDX.setdefault(attr, temp_mm_c)
             # print(len(MM_V.keys()))
             # raise RuntimeError("Break")
 

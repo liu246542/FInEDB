@@ -53,6 +53,9 @@ class REMM(object):
                     # print(label)
                     # print(value[0:3])
                     enc_value = prf_256(K_T, j)
+                    if isinstance(j, bytes):
+                        # enc_value = prf_256(K_T, j)
+                        enc_value = j
                     stag_count = stag + str(i).encode()
                     b = int.from_bytes(hash_to_fixsize(1, stag_count),
                                        byteorder="big")

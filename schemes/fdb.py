@@ -30,7 +30,6 @@ class Client(object):
     def construct_index(self):
         # Raw_Tables => inverted index
         inverted_index = {}
-        bff = BFF()
         remm = REMM()
         K_J = self.SK.K_J
         for table_info in self.Raw_Tables:
@@ -66,9 +65,22 @@ class Client(object):
                     if attr == "_id":
                         label = t_name + attr + str(row_dict[attr])
                         # label = prf_256(self.SK.K_T, label)
-                        value = bff.construct(row_dict, K_e, K_v, K_J,
-                                              t_data.columns, t_type,
-                                              Node_Index)
+                        for retry in range(10):
+                            bff = BFF()
+                            bff_rest = bff.construct(row_dict, K_e, K_v, K_J,
+                                                     self.SK.K_T,
+                                                     t_data.columns,
+                                                     t_type, Node_Index)
+                            (flag, value, tdict) = bff_rest
+                            if flag == 1:
+                                break
+                        if flag == 0:
+                            raise RuntimeError(f"Cannot Initialize BFF")
+                        inverted_index.update(tdict)
+
+                        # value = bff.construct(row_dict, K_e, K_v, K_J,
+                                              # t_data.columns, t_type,
+                                              # Node_Index)
                     else:
                         label = attr + str(row_dict[attr])
                         # label = prf_256(self.SK.K_T, label)
