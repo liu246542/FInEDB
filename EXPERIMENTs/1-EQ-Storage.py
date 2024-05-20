@@ -29,8 +29,10 @@ def test_storage_size(folder_list, tb_list):
 
 
 if __name__ == '__main__':
-    test_folder = ["../data/sf0.008", "../data/sf0.009",
-                   "../data/sf0.01"]
+    test_folder = ["../data/sf0.001", "../data/sf0.002", "../data/sf0.003"]
+                   # "../data/sf0.004", "../data/sf0.005", "../data/sf0.006",
+                   # "../data/sf0.007", "../data/sf0.008", "../data/sf0.009",
+                   # "../data/sf0.01"]
     tb_list = ["customer", "lineitem", "nation", "orders",
                "part", "partsupp", "region", "supplier"]
     # (m_f, d_f, m_s, d_s) = test_storage_size(test_folder, tb_list)

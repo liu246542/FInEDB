@@ -9,6 +9,24 @@ from utils import pysize, TDAG
 
 SecretKey = namedtuple("SecretKey", ["K_T", "K_S", "K_J"])
 
+Table_Relations = {
+    "customer/_id": ["c_id_o_custkey"],
+    "customer/C_NATIONKEY": ["c_nationkey_nation_id"],
+    "lineitem/L_ORDERKEY": ["l_orderkey_order_id"],
+    "lineitem/L_PARTKEY": ["l_partkey_part_id"],
+    "lineitem/L_SUPPKEY": ["l_suppkey_supplier_id"],
+    "nation/_id": ["c_nationkey_nation_id", "s_nationkey_nation_id"],
+    "nation/N_REGIONKEY": ["n_regionkey_region_id"],
+    "orders/_id": ["l_orderkey_order_id"],
+    "orders/O_CUSTKEY": ["c_id_o_custkey"],
+    "part/_id": ["l_partkey_part_id", "p_id_partsupp_ps_partkey"],
+    "partsupp/PS_PARTKEY": ["p_id_partsupp_ps_partkey"],
+    "partsupp/PS_SUPPKEY": ["ps_suppkey_supplier_id"],
+    "regin/_id": ["n_regionkey_region_id"],
+    "supplier/_id": ["ps_suppkey_supplier_id", "l_suppkey_supplier_id"],
+    "supplier/S_NATIONKEY": ["s_nationkey_nation_id"]
+}
+
 
 class Client(object):
     """docstring for Client"""

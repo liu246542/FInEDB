@@ -16,82 +16,102 @@ DB_STRUCTION = {
     "customer": {
         "attributes":
             ['_id', 'C_NAME', 'C_ADDRESS', 'C_NATIONKEY', 'C_PHONE',
-             'C_ACCTBAL', 'MKT_SEGMENT'],
-        "type": [1, 1, 1, 1, 1, 1, 1]
+             'C_ACCTBAL', 'MKT_SEGMENT', 'C_COMMENT'],
+        "type": [1, 1, 1, 1, 1, 1, 1, 0]
     },
     "customer_rg": {
         "attributes":
             ['_id', 'C_NAME', 'C_ADDRESS', 'C_NATIONKEY', 'C_PHONE',
-             'C_ACCTBAL', 'MKT_SEGMENT'],
-        "type": [2, 1, 1, 1, 1, 1, 1]
+             'C_ACCTBAL', 'MKT_SEGMENT', 'C_COMMENT'],
+        "type": [2, 1, 1, 1, 1, 1, 1, 0]
+    },
+    "customer_join": {
+        "attributes":
+            ['_id', 'C_NAME', 'C_ADDRESS', 'C_NATIONKEY', 'C_PHONE',
+             'C_ACCTBAL', 'MKT_SEGMENT', 'C_COMMENT'],
+        "type": [3, 1, 1, 3, 1, 1, 1, 0]
     },
     "lineitem": {
         "attributes":
             ['L_ORDERKEY', 'L_PARTKEY', 'L_SUPPKEY', 'L_LINENUMBER',
              'L_QUANTITY', 'L_EXTENDEDPRICE', 'L_DISCOUNT', 'L_TAX',
              'L_RETURNFLAG', 'L_LINESTATUS', 'L_SHIPDATE', 'L_COMMITDATE',
-             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE'],
+             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE', 'L_COMMENT'],
         "type": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1]
+                 1, 1, 1, 1, 1, 0]
     },
     "lineitem_rg": {
         "attributes":
             ['L_ORDERKEY', 'L_PARTKEY', 'L_SUPPKEY', 'L_LINENUMBER',
              'L_QUANTITY', 'L_EXTENDEDPRICE', 'L_DISCOUNT', 'L_TAX',
              'L_RETURNFLAG', 'L_LINESTATUS', 'L_SHIPDATE', 'L_COMMITDATE',
-             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE'],
+             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE', 'L_COMMENT'],
         "type": [2, 2, 2, 2, 2, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1]
+                 1, 1, 1, 1, 1, 0]
     },
     "lineitem_join": {
         "attributes":
             ['L_ORDERKEY', 'L_PARTKEY', 'L_SUPPKEY', 'L_LINENUMBER',
              'L_QUANTITY', 'L_EXTENDEDPRICE', 'L_DISCOUNT', 'L_TAX',
              'L_RETURNFLAG', 'L_LINESTATUS', 'L_SHIPDATE', 'L_COMMITDATE',
-             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE'],
+             'L_RECEIPTDATE', 'L_SHIPINSTRUCT', 'L_SHIPMODE', 'L_COMMENT'],
         "type": [3, 3, 3, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1]
+                 1, 1, 1, 1, 1, 0]
     },
     "nation": {
-        "attributes": ['_id', 'N_NAME', 'N_REGIONKEY'],
-        "type": [1, 1, 1]
+        "attributes": ['_id', 'N_NAME', 'N_REGIONKEY', 'N_COMMENT'],
+        "type": [1, 1, 1, 0]
+    },
+    "nation_join": {
+        "attributes": ['_id', 'N_NAME', 'N_REGIONKEY', 'N_COMMENT'],
+        "type": [3, 1, 3, 0]
     },
     "orders": {
         "attributes":
             ['_id', 'O_CUSTKEY', 'O_ORDERSTATUS', 'O_TOTALPRICE',
-             'O_ORDERDATE', 'O_ORDERPRIORITY', 'O_CLERK', 'O_SHIPPRIORITY'],
-        "type": [1, 1, 1, 1, 1, 1, 1, 1]
+             'O_ORDERDATE', 'O_ORDERPRIORITY', 'O_CLERK', 'O_SHIPPRIORITY',
+             'O_COMMENT'],
+        "type": [1, 1, 1, 1, 1, 1, 1, 1, 0]
     },
     "part": {
         "attributes": ['_id', 'P_NAME', 'P_MFGR', 'P_BRAND', 'P_TYPE',
-                       'P_SIZE', 'P_CONTAINER', 'P_RETAILPRICE'],
-        "type": [1, 1, 1, 1, 1, 1, 1, 1]
+                       'P_SIZE', 'P_CONTAINER', 'P_RETAILPRICE', 'P_COMMENT'],
+        "type": [1, 1, 1, 1, 1, 1, 1, 1, 0]
 
     },
     "partsupp": {
         "attributes": ['PS_PARTKEY', 'PS_SUPPKEY', 'PS_AVAILQTY',
-                       'PS_SUPPLYCOST'],
-        "type": [1, 1, 1, 1]
+                       'PS_SUPPLYCOST', 'PS_COMMENT'],
+        "type": [1, 1, 1, 1, 0]
     },
     "region": {
-        "attributes": ['_id', 'R_NAME'],
-        "type": [1, 1]
+        "attributes": ['_id', 'R_NAME', 'R_COMMENT'],
+        "type": [1, 1, 0]
     },
     "supplier": {
         "attributes": ['_id', 'S_NAME', 'S_ADDRESS', 'S_NATIONKEY',
-                       'S_PHONE', 'S_ACCTBAL'],
-        "type": [1, 1, 1, 1, 1, 1]
+                       'S_PHONE', 'S_ACCTBAL', 'S_COMMENT'],
+        "type": [1, 1, 1, 1, 1, 1, 0]
     }
 }
 
 
-def ParseRawData(folder_name, table_name):
+def ParseRawData(folder_name, table_name, comment_flag=0):
     file_path = os.path.join(folder_name, table_name + ".tbl")
     raw_data = pd.read_csv(file_path, sep="|", header=None)
+    if comment_flag:
+        raw_data = raw_data.drop(columns=raw_data.columns[-1])
+        raw_data.columns = DB_STRUCTION[table_name]["attributes"]
+        attr_type = DB_STRUCTION[table_name]["type"]
+    else:
+        raw_data = raw_data.drop(columns=raw_data.columns[-2:])
+        raw_data.columns = DB_STRUCTION[table_name]["attributes"][0:-1]
+        attr_type = DB_STRUCTION[table_name]["type"][0:-1]
+
     # raw_data = raw_data.drop(columns=raw_data.columns[-1])
-    raw_data = raw_data.drop(columns=raw_data.columns[-2:])
-    raw_data.columns = DB_STRUCTION[table_name]["attributes"]
-    attr_type = DB_STRUCTION[table_name]["type"]
+    # raw_data = raw_data.drop(columns=raw_data.columns[-2:])
+    # raw_data.columns = DB_STRUCTION[table_name]["attributes"]
+    # attr_type = DB_STRUCTION[table_name]["type"]
     if "_id" not in raw_data.columns:
         raw_data["_id"] = range(len(raw_data.index))
         attr_type.append(1)

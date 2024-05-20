@@ -9,6 +9,25 @@ from utils import pysize, TDAG
 SecretKey = namedtuple("SecretKey", ["K_1", "K_R", "K_V", "K_C", "K_D", "K_c"])
 
 
+Table_Relations = {
+    "customer_join/_id": ["c_id_o_custkey"],
+    "customer_join/C_NATIONKEY": ["c_nationkey_nation_id"],
+    "lineitem_join/L_ORDERKEY": ["l_orderkey_order_id"],
+    "lineitem_join/L_PARTKEY": ["l_partkey_part_id"],
+    "lineitem_join/L_SUPPKEY": ["l_suppkey_supplier_id"],
+    "nation_join/_id": ["c_nationkey_nation_id", "s_nationkey_nation_id"],
+    "nation_join/N_REGIONKEY": ["n_regionkey_region_id"],
+    "orders_join/_id": ["l_orderkey_order_id"],
+    "orders_join/O_CUSTKEY": ["c_id_o_custkey"],
+    "part_join/_id": ["l_partkey_part_id", "p_id_partsupp_ps_partkey"],
+    "partsupp_join/PS_PARTKEY": ["p_id_partsupp_ps_partkey"],
+    "partsupp_join/PS_SUPPKEY": ["ps_suppkey_supplier_id"],
+    "regin_join/_id": ["n_regionkey_region_id"],
+    "supplier_join/_id": ["ps_suppkey_supplier_id", "l_suppkey_supplier_id"],
+    "supplier_join/S_NATIONKEY": ["s_nationkey_nation_id"]
+}
+
+
 class Client(object):
     """docstring for Client"""
 
@@ -32,10 +51,13 @@ class Client(object):
         MM_C = {}
         MM_V = {}
         EDX = {}
+        Ignore_att = set()
         STE = TSet()
         for table_info in self.Raw_Tables:
             (t_name, t_data, t_type) = table_info
             for i, t in enumerate(t_type):
+                if t == 0:
+                    Ignore_att.add(t_data.columns[i])
                 if t == 2:
                     attr = t_data.columns[i]
                     value_list = list(t_data[attr])
@@ -72,11 +94,22 @@ class Client(object):
                     value_list = list(t_data[attr])
                     row_list = list(t_data["_id"])
                     for i, value in enumerate(value_list):
-                        label_c = value
-                        value_c = t_name + attr + row_list[i]
-                        temp_mm_c.setdefault(label_c, [])
-                        temp_mm_c[label_c].append(value_c)
-                    EDX.setdefault(attr, temp_mm_c)
+                        lab_list = Table_Relations.get(t_name + "/" + attr)
+                        # print(t_name + "/" + attr)
+                        # print(attr)
+                        # print(lab_list)
+                        # value_c = t_name + attr + row_list[i]
+                        value_c = t_name + "_id" + str(row_list[i])
+                        rtk_r = STE.gen_token(value_c, self.SK.K_R)
+                        for pre_id in lab_list:
+                            label_c = pre_id + str(value)
+                            temp_mm_c.setdefault(label_c, [])
+                            temp_mm_c[label_c].append(rtk_r)
+                        # label_c = value
+                        # temp_mm_c.setdefault(label_c, [])
+                        # temp_mm_c[label_c].append(value_c)
+                    emm_c = STE.setup(temp_mm_c, self.SK.K_C)
+                    EDX.setdefault(attr, emm_c)
             # print(len(MM_V.keys()))
             # raise RuntimeError("Break")
 
@@ -90,6 +123,8 @@ class Client(object):
                 row_dict = row[1].to_dict()
                 value_r = []
                 for attr in t_data.columns:
+                    if attr in Ignore_att:
+                        continue
                     value_str = str(row_dict[attr])
                     enc_value = bytes(aes_enc(self.SK.K_1, value_str), "utf-8")
                     value_r.append(enc_value)
