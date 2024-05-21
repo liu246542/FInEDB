@@ -83,7 +83,7 @@ class Client(object):
                     if attr == "_id":
                         label = t_name + attr + str(row_dict[attr])
                         # label = prf_256(self.SK.K_T, label)
-                        for retry in range(10):
+                        for retry in range(100):
                             bff = BFF()
                             bff_rest = bff.construct(row_dict, K_e, K_v, K_J,
                                                      self.SK.K_T,

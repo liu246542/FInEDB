@@ -31,10 +31,23 @@ def test_storage_size(folder_list, tb_list, rg_tb_list):
 
 if __name__ == '__main__':
     # "../data/sf0.001", "../data/sf0.002", "../data/sf0.003",
+    # test_folder = ["../data/sf0.005"]
     test_folder = ["../data/sf0.001"]
+    # "../data/sf0.002", "../data/sf0.003",
+                   # "../data/sf0.004", "../data/sf0.005", "../data/sf0.006",
+                   # "../data/sf0.007", "../data/sf0.008", "../data/sf0.009"]
                    # "../data/sf0.01"]
     tb_list = ["lineitem"]
     rg_tb_list = ["lineitem_rg"]
 
     test_result = test_storage_size(test_folder, tb_list, rg_tb_list)
-    print(test_result)
+
+    data_frame = pd.DataFrame({
+        "Scale": [x.split("/")[2] for x in test_folder],
+        "Original Size": [Decimal(x / 1048576).quantize(Decimal("0.00"))
+                          for x in test_result[0]],
+        "Modified Size": [Decimal(x / 1048576).quantize(Decimal("0.00"))
+                          for x in test_result[1]],
+        "Ratio": test_result[2]
+    })
+    print(data_frame)

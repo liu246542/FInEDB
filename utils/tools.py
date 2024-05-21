@@ -293,13 +293,16 @@ class BFF(object):
         label_num = len(temp_dict.keys())
         # segment_range = 2 ** (math.floor(math.log(label_num, 3.33) + 2.25))
         segment_range = math.ceil(4.8 * (label_num ** 0.58))
-        # segment_range = math.ceil(0.7 * (label_num ** 0.65))
+        # segment_range = math.ceil(0.9 * (label_num ** 0.65))
+        # segment_range = 2 ** (math.floor(math.log(label_num, 2.91) - 0.5))
         # segment_range = 16
         # segment_num = math.ceil(1.075 * label_num / segment_range)
+        # segment_num = math.ceil(1.125 * label_num / segment_range)
         # segment_num = math.ceil(1.125 * label_num / segment_range)
         segment_num = math.ceil(1.125 * label_num / segment_range)
         if segment_num < self.hash_num:
             segment_num = self.hash_num
+            segment_range = math.ceil(1.5 * label_num / segment_num)
 
         # segment_num = math.ceil(1.2 * label_num / self.segment_range)
         # print(f"-----------{segment_num}")
