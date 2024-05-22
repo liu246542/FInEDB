@@ -5,7 +5,7 @@ import pandas as pd
 from decimal import Decimal
 from functools import partial
 from multiprocessing import Pool
-from schemes import spx, fdb
+from schemes import fdb
 # from utils import pysize
 
 
@@ -19,14 +19,6 @@ def atom_process_task(folder_name, tb_list):
     emm_size.append(len(pickle.dumps(emm[1], -1)))
     del ct_fdb, emm
 
-    ct_spx = spx.Client()
-    ct_spx.load_tables(folder_name, tb_list)
-    emm = ct_spx.construct_index()
-    emm_size.append(len(pickle.dumps(emm, -1)))
-    for e in emm:
-        emm_size.append(len(pickle.dumps(e, -1)))
-    del ct_spx, emm
-
     return emm_size
 
 
@@ -35,12 +27,6 @@ def test_storage_size(folder_list, tb_list):
     disk_size_fdb = []
     filter_size_fdb = []
     # memo_size_spx = []
-    disk_size_spx = []
-
-    EMM_R_size = []
-    EMM_C_size = []
-    EMM_V_size = []
-    EDX_size = []
 
     # size_list = list(map(partial(atom_process_task,
                                  # tb_list=tb_list), folder_list))
@@ -51,11 +37,6 @@ def test_storage_size(folder_list, tb_list):
     for size_tuple in size_list:
         disk_size_fdb.append(size_tuple[0])
         filter_size_fdb.append(size_tuple[1])
-        disk_size_spx.append(size_tuple[2])
-        EMM_R_size.append(size_tuple[3])
-        EMM_C_size.append(size_tuple[4])
-        EMM_V_size.append(size_tuple[5])
-        EDX_size.append(size_tuple[6])
 
     """
     for folder_name in folder_list:
@@ -73,23 +54,18 @@ def test_storage_size(folder_list, tb_list):
         disk_size_spx.append(len(pickle.dumps(emm, -1)))
         del ct_spx, emm
     """
-    return (disk_size_fdb, filter_size_fdb, disk_size_spx,
-            EMM_R_size, EMM_C_size, EMM_V_size, EDX_size)
+    return (disk_size_fdb, filter_size_fdb)
 
 
 if __name__ == '__main__':
-    test_folder = ["../data/sf0.001", "../data/sf0.002",
-                   "../data/sf0.003", "../data/sf0.004",
-                   "../data/sf0.005", "../data/sf0.006",
-                   "../data/sf0.007", "../data/sf0.008",
-                   "../data/sf0.009", "../data/sf0.01"]
+    test_folder = ["../data/sf0.01", "../data/sf0.1"]
                    # "../data/sf0.004", "../data/sf0.005", "../data/sf0.006",
                    # "../data/sf0.007", "../data/sf0.008", "../data/sf0.009",
                    # "../data/sf0.01"]
     tb_list = ["customer", "lineitem", "nation", "orders",
                "part", "partsupp", "region", "supplier"]
     # (m_f, d_f, m_s, d_s) = test_storage_size(test_folder, tb_list)
-    (d_f, f_s, d_s, emmr, emmc, emmv, edx) = test_storage_size(test_folder, tb_list)
+    (d_f, f_s) = test_storage_size(test_folder, tb_list)
     data_frame = pd.DataFrame({
         "Scale": [x.split("/")[2] for x in test_folder],
         # "Memory Size FInEDB": m_f,
@@ -97,19 +73,9 @@ if __name__ == '__main__':
         "Disk Size FInEDB": [Decimal(x / 1048576).quantize(Decimal("0.00"))
                              for x in d_f],
         "Filter Size FInEDB": [Decimal(x / 1048576).quantize(Decimal("0.00"))
-                               for x in f_s],
+                               for x in f_s]
         # "Memory Size SPX": m_s,
         # "Disk Size SPX": d_s
-        "Disk Size SPX": [Decimal(x / 1048576).quantize(Decimal("0.00"))
-                          for x in d_s],
-        "EMM_R": [Decimal(x / 1048576).quantize(Decimal("0.00"))
-                  for x in emmr],
-        "EMM_C": [Decimal(x / 1048576).quantize(Decimal("0.00"))
-                  for x in emmc],
-        "EMM_V": [Decimal(x / 1048576).quantize(Decimal("0.00"))
-                  for x in emmv],
-        "EDX": [Decimal(x / 1048576).quantize(Decimal("0.00"))
-                for x in edx]
     })
     # data_frame.to_csv("./1-EQ-Storage.csv", index=False)
     print(data_frame)

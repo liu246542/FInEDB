@@ -48,6 +48,7 @@ class Client(object):
     def construct_index(self):
         # Raw_Tables => inverted index
         inverted_index = {}
+        filter_dict = {}  # only for test, not need in Scheme
         remm = REMM()
         K_J = self.SK.K_J
         for table_info in self.Raw_Tables:
@@ -90,11 +91,14 @@ class Client(object):
                                                      t_data.columns,
                                                      t_type, Node_Index)
                             (flag, value, tdict) = bff_rest
+                            # here, value is a filter
                             if flag == 1:
                                 break
                         if flag == 0:
                             raise RuntimeError(f"Cannot Initialize BFF")
                         inverted_index.update(tdict)
+                        filter_dict.setdefault(label, [])
+                        filter_dict[label].append(value)
 
                         # value = bff.construct(row_dict, K_e, K_v, K_J,
                                               # t_data.columns, t_type,
@@ -106,7 +110,9 @@ class Client(object):
                     inverted_index.setdefault(label, [])
                     inverted_index[label].append(value)
         emm = remm.setup(inverted_index, self.SK.K_T)
-        return emm
+        filter_emm = remm.setup(filter_dict, self.SK.K_T)
+        return (emm, filter_emm)
+        # return (emm, filter_emm
         # with open("./DUMPs/sf0.01/inverted.pkl", "wb") as f:
         # pickle.dump(emm, f)
 

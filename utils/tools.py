@@ -2,15 +2,16 @@
 
 import os
 import math
-import hashlib
 import hmac
 import json
-import pandas as pd
 # import time
+import hashlib
+import pandas as pd
 from .TDAG import TDAG
 from charm.toolbox.symcrypto import SymmetricCryptoAbstraction
 from charm.core.math.integer import randomBits
 from queue import LifoQueue
+# from multiprocessing import Pool
 
 DB_STRUCTION = {
     "customer": {
@@ -132,6 +133,14 @@ def prf_256(key, data):
     return h.digest()  # output's length is 32 bytes, i.e., 32 * 8 = 256
 
 
+def prf_any(key, data, output_length):
+    if not isinstance(data, bytes):
+        data = bytes(data, "utf-8")
+    h = hashlib.blake2b(key=key, digest_size=output_length)
+    h.update(data)
+    return h.digest()
+
+
 def aes_enc(key, plaintext):
     symcrypt = SymmetricCryptoAbstraction(key)
     cryptext = symcrypt.encrypt(plaintext)
@@ -161,6 +170,8 @@ def aes_dec(key, cryptext):
 def bxor(b1, b2):
     if b1 == 0:
         return b2
+    # print(len(b1))
+    # print(len(b2))
     assert len(b1) == len(b2)
     return bytes(x ^ y for x, y in zip(b1, b2))
 
@@ -196,7 +207,8 @@ class BFF(object):
         self.hash_num = hash_num
         # self.segment_range = segment_range
         # self.segment_num = segment_num
-        self.nonce = str(gen_key(32))
+        # self.nonce = str(gen_key(32))
+        self.nonce = str(gen_key(8))
 
     def __hashfunc__(self, key, segment_num, segment_range):
         pos_list = []
@@ -216,12 +228,27 @@ class BFF(object):
         # print(pos_list)
         return pos_list
 
+    # def __atom_construct__(self, att_tuple):
+    #     (i, att) = att_tuple
+    #     label = att + "SELECT"
+    #     label = str(prf_256(K_2, label))
+
+    #     label_prime = gen_key(32)
+    #     value_prime = bytes(aes_enc(K_1, str()))
+    #     pass
+
     def construct(self, dict_data, K_1, K_2, K_J,
                   K_T, att_list, type_list, Node_Index):
         temp_dict = {}
         temp_hash = {}
         temp_p2lable = {}
         temp_inverted_index = {}
+
+        # self.temp_dict = {}
+
+        # with Pool() as p:
+        # p.map(self.__atom_construct__, list(enumerate(att_list)))
+
         for i, att in enumerate(att_list):
             # All attributes need to append "SELECT"
 
@@ -242,9 +269,11 @@ class BFF(object):
             value_prime = bytes(aes_enc(K_1, str(dict_data[att])), "utf-8")
             temp_inverted_index.setdefault(label_prime, [value_prime])
 
-            value = prf_256(K_T, label_prime)
+            # value = prf_256(K_T, label_prime)
+            value = prf_any(K_T, label_prime, 4)
             # value = prf_256(K_2, "1")
-            assert len(value) == 32
+            # assert len(value) == 32
+            assert len(value) == 4
             temp_dict.setdefault(label, value)
 
             if type_list[i] >= 1:
@@ -253,8 +282,9 @@ class BFF(object):
                 # att + "WHERE" => PRF(K_2, dict_data[att])
                 label = att + "WHERE"
                 label = str(prf_256(K_2, label))
-                value = prf_256(K_2, str(dict_data[att]))
-                assert len(value) == 32
+                # value = prf_256(K_2, str(dict_data[att]))
+                value = prf_any(K_2, str(dict_data[att]), 4)
+                assert len(value) == 4
                 # Padding to 128 Bytes with zeros
                 # value = value.ljust(128, b"0")
                 temp_dict.setdefault(label, value)
@@ -269,8 +299,10 @@ class BFF(object):
                     label = n + att + "node"
                     # label = str(prf_256(K_2, gen_key(1024)))
                     label = str(prf_256(K_2, label))
-                    value = prf_256(K_2, n)
-                    assert len(value) == 32
+                    # value = prf_256(K_2, n)
+                    value = prf_any(K_2, n, 4)
+                    assert len(value) == 4
+                    # assert len(value) == 32
                     # value = value.ljust(128, b"0")
                     temp_dict.setdefault(label, value)
                 # """
@@ -280,8 +312,10 @@ class BFF(object):
 
                 # att + "JOIN" => PRF(K_J, dict_data[att])
                 label = att + "JOIN"
-                value = prf_256(K_J, str(dict_data[att]))
-                assert len(value) == 32
+                # value = prf_256(K_J, str(dict_data[att]))
+                value = prf_any(K_J, str(dict_data[att]), 4)
+                # assert len(value) == 32
+                assert len(value) == 4
                 # Padding to 128 Bytes with zeros
                 # value = value.ljust(128, b"0")
                 temp_dict.setdefault(label, value)
@@ -369,13 +403,16 @@ class BFF(object):
             pos_tuple = temp_hash.get(label)
             value = temp_dict.get(label)
             # assert len(value) == 128
-            assert len(value) == 32
+            # assert len(value) == 32
+            assert len(value) == 4
 
             single_pos = [p for p in pos_tuple if fuse_filter[p] == 0]
             xor_value = value
             for i in range(len(single_pos) - 1):
                 # fuse_filter[single_pos.pop(0)] = gen_key(1024)
-                fuse_filter[single_pos.pop(0)] = gen_key(256)
+                # fuse_filter[single_pos.pop(0)] = gen_key(256)
+                # fuse_filter[single_pos.pop(0)] = gen_key(64)
+                fuse_filter[single_pos.pop(0)] = gen_key(32)
             for p in pos_tuple:
                 if p not in single_pos:
                     xor_value = bxor(xor_value, fuse_filter[p])
