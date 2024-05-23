@@ -14,7 +14,7 @@ def atom_process_task(folder_name, tb_list):
 
     ct_fdb = fdb.Client()
     ct_fdb.load_tables(folder_name, tb_list)
-    emm = ct_fdb.construct_index()
+    emm = ct_fdb.construct_index(test_flag=1)
     emm_size.append(len(pickle.dumps(emm[0], -1)))
     emm_size.append(len(pickle.dumps(emm[1], -1)))
     del ct_fdb, emm

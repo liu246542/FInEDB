@@ -4,7 +4,8 @@ import pickle
 from collections import namedtuple
 from utils.tools import gen_key, ParseRawData, aes_enc
 from utils.TSet import TSet
-from utils import pysize, TDAG
+from utils import TDAG
+from copy import deepcopy
 
 SecretKey = namedtuple("SecretKey", ["K_1", "K_R", "K_V", "K_C", "K_D", "K_c"])
 
@@ -22,7 +23,7 @@ Table_Relations = {
     "part_join/_id": ["l_partkey_part_id", "p_id_partsupp_ps_partkey"],
     "partsupp_join/PS_PARTKEY": ["p_id_partsupp_ps_partkey"],
     "partsupp_join/PS_SUPPKEY": ["ps_suppkey_supplier_id"],
-    "regin_join/_id": ["n_regionkey_region_id"],
+    "region_join/_id": ["n_regionkey_region_id"],
     "supplier_join/_id": ["ps_suppkey_supplier_id", "l_suppkey_supplier_id"],
     "supplier_join/S_NATIONKEY": ["s_nationkey_nation_id"]
 }
@@ -41,7 +42,7 @@ class Client(object):
     def load_tables(self, folder_name, table_name_list):
         Raw_Tables = []
         for table_name in table_name_list:
-            Raw_Tables.append(ParseRawData(folder_name, table_name))
+            Raw_Tables.append(ParseRawData(folder_name, table_name, 1))
         print("-" * 20 + "LOAD COMPLETE" + "-" * 20)
         self.Raw_Tables = Raw_Tables
 
@@ -95,6 +96,9 @@ class Client(object):
                     row_list = list(t_data["_id"])
                     for i, value in enumerate(value_list):
                         lab_list = Table_Relations.get(t_name + "/" + attr)
+                        # print(t_name)
+                        # print(attr)
+                        # print(lab_list)
                         # print(t_name + "/" + attr)
                         # print(attr)
                         # print(lab_list)
@@ -109,7 +113,7 @@ class Client(object):
                         # temp_mm_c.setdefault(label_c, [])
                         # temp_mm_c[label_c].append(value_c)
                     emm_c = STE.setup(temp_mm_c, self.SK.K_C)
-                    EDX.setdefault(attr, emm_c)
+                    EDX.setdefault(attr, deepcopy(emm_c))
             # print(len(MM_V.keys()))
             # raise RuntimeError("Break")
 

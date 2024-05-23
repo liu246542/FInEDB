@@ -4,8 +4,7 @@ import pickle
 from collections import namedtuple
 from utils.tools import gen_key, prf_256, BFF, ParseRawData
 from utils.REMM import REMM
-from utils import pysize, TDAG
-
+from utils import TDAG
 
 SecretKey = namedtuple("SecretKey", ["K_T", "K_S", "K_J"])
 
@@ -32,8 +31,8 @@ class Client(object):
     """docstring for Client"""
 
     def __init__(self, lamba=256, SK=None):
-        # (K_T, K_e, K_J) = [gen_key(lamba) for i in range(3)]
         if SK is None:
+            # SK = (K_T, K_S, K_J)
             self.SK = SecretKey(*[gen_key(lamba) for i in range(3)])
         else:
             self.SK = SK
@@ -41,14 +40,15 @@ class Client(object):
     def load_tables(self, folder_name, table_name_list):
         Raw_Tables = []
         for table_name in table_name_list:
-            Raw_Tables.append(ParseRawData(folder_name, table_name))
+            Raw_Tables.append(ParseRawData(folder_name, table_name, 1))
         print("-" * 20 + "LOAD COMPLETE" + "-" * 20)
         self.Raw_Tables = Raw_Tables
 
-    def construct_index(self):
-        # Raw_Tables => inverted index
+    def construct_index(self, test_flag=0):
+        # Raw_Tables => inverted index (BFF inside)
         inverted_index = {}
-        filter_dict = {}  # only for test, not need in Scheme
+        if test_flag:
+            filter_dict = {}  # only for test, not need in Scheme
         remm = REMM()
         K_J = self.SK.K_J
         for table_info in self.Raw_Tables:
@@ -59,7 +59,6 @@ class Client(object):
             for i, t in enumerate(t_type):
                 if t == 2:
                     attr = t_data.columns[i]
-                    # print(attr)
                     value_list = list(t_data[attr])
 
                     max_value = max(value_list)
@@ -97,24 +96,21 @@ class Client(object):
                         if flag == 0:
                             raise RuntimeError(f"Cannot Initialize BFF")
                         inverted_index.update(tdict)
-                        filter_dict.setdefault(label, [])
-                        filter_dict[label].append(value)
-
-                        # value = bff.construct(row_dict, K_e, K_v, K_J,
-                                              # t_data.columns, t_type,
-                                              # Node_Index)
+                        if test_flag:
+                            filter_dict.setdefault(label, [])
+                            filter_dict[label].append(value)
                     else:
+                        # For those attributes are not "_id"
                         label = attr + str(row_dict[attr])
                         # label = prf_256(self.SK.K_T, label)
                         value = t_name + "_id" + str(row_dict["_id"])
                     inverted_index.setdefault(label, [])
                     inverted_index[label].append(value)
         emm = remm.setup(inverted_index, self.SK.K_T)
-        filter_emm = remm.setup(filter_dict, self.SK.K_T)
-        return (emm, filter_emm)
-        # return (emm, filter_emm
-        # with open("./DUMPs/sf0.01/inverted.pkl", "wb") as f:
-        # pickle.dump(emm, f)
+        if test_flag:
+            filter_emm = remm.setup(filter_dict, self.SK.K_T)
+            return (emm, filter_emm)
+        return emm
 
 
 if __name__ == '__main__':

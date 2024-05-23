@@ -4,7 +4,6 @@ import os
 import math
 import hmac
 import json
-# import time
 import hashlib
 import pandas as pd
 from .TDAG import TDAG
@@ -63,6 +62,10 @@ DB_STRUCTION = {
         "attributes": ['_id', 'N_NAME', 'N_REGIONKEY', 'N_COMMENT'],
         "type": [1, 1, 1, 0]
     },
+    "nation_rg": {
+        "attributes": ['_id', 'N_NAME', 'N_REGIONKEY', 'N_COMMENT'],
+        "type": [2, 1, 2, 0]
+    },
     "nation_join": {
         "attributes": ['_id', 'N_NAME', 'N_REGIONKEY', 'N_COMMENT'],
         "type": [3, 1, 3, 0]
@@ -74,10 +77,36 @@ DB_STRUCTION = {
              'O_COMMENT'],
         "type": [1, 1, 1, 1, 1, 1, 1, 1, 0]
     },
+    "orders_rg": {
+        "attributes":
+            ['_id', 'O_CUSTKEY', 'O_ORDERSTATUS', 'O_TOTALPRICE',
+             'O_ORDERDATE', 'O_ORDERPRIORITY', 'O_CLERK', 'O_SHIPPRIORITY',
+             'O_COMMENT'],
+        "type": [2, 2, 1, 1, 1, 1, 1, 1, 0]
+    },
+    "orders_join": {
+        "attributes":
+            ['_id', 'O_CUSTKEY', 'O_ORDERSTATUS', 'O_TOTALPRICE',
+             'O_ORDERDATE', 'O_ORDERPRIORITY', 'O_CLERK', 'O_SHIPPRIORITY',
+             'O_COMMENT'],
+        "type": [3, 3, 1, 1, 1, 1, 1, 1, 0]
+    },
     "part": {
         "attributes": ['_id', 'P_NAME', 'P_MFGR', 'P_BRAND', 'P_TYPE',
                        'P_SIZE', 'P_CONTAINER', 'P_RETAILPRICE', 'P_COMMENT'],
         "type": [1, 1, 1, 1, 1, 1, 1, 1, 0]
+
+    },
+    "part_rg": {
+        "attributes": ['_id', 'P_NAME', 'P_MFGR', 'P_BRAND', 'P_TYPE',
+                       'P_SIZE', 'P_CONTAINER', 'P_RETAILPRICE', 'P_COMMENT'],
+        "type": [2, 1, 1, 1, 1, 2, 1, 1, 0]
+
+    },
+    "part_join": {
+        "attributes": ['_id', 'P_NAME', 'P_MFGR', 'P_BRAND', 'P_TYPE',
+                       'P_SIZE', 'P_CONTAINER', 'P_RETAILPRICE', 'P_COMMENT'],
+        "type": [3, 1, 1, 1, 1, 1, 1, 1, 0]
 
     },
     "partsupp": {
@@ -85,20 +114,48 @@ DB_STRUCTION = {
                        'PS_SUPPLYCOST', 'PS_COMMENT'],
         "type": [1, 1, 1, 1, 0]
     },
+    "partsupp_rg": {
+        "attributes": ['PS_PARTKEY', 'PS_SUPPKEY', 'PS_AVAILQTY',
+                       'PS_SUPPLYCOST', 'PS_COMMENT'],
+        "type": [2, 2, 2, 1, 0]
+    },
+    "partsupp_join": {
+        "attributes": ['PS_PARTKEY', 'PS_SUPPKEY', 'PS_AVAILQTY',
+                       'PS_SUPPLYCOST', 'PS_COMMENT'],
+        "type": [3, 3, 1, 1, 0]
+    },
     "region": {
         "attributes": ['_id', 'R_NAME', 'R_COMMENT'],
         "type": [1, 1, 0]
+    },
+    "region_rg": {
+        "attributes": ['_id', 'R_NAME', 'R_COMMENT'],
+        "type": [2, 1, 0]
+    },
+    "region_join": {
+        "attributes": ['_id', 'R_NAME', 'R_COMMENT'],
+        "type": [3, 1, 0]
     },
     "supplier": {
         "attributes": ['_id', 'S_NAME', 'S_ADDRESS', 'S_NATIONKEY',
                        'S_PHONE', 'S_ACCTBAL', 'S_COMMENT'],
         "type": [1, 1, 1, 1, 1, 1, 0]
+    },
+    "supplier_rg": {
+        "attributes": ['_id', 'S_NAME', 'S_ADDRESS', 'S_NATIONKEY',
+                       'S_PHONE', 'S_ACCTBAL', 'S_COMMENT'],
+        "type": [2, 1, 1, 2, 1, 1, 0]
+    },
+    "supplier_join": {
+        "attributes": ['_id', 'S_NAME', 'S_ADDRESS', 'S_NATIONKEY',
+                       'S_PHONE', 'S_ACCTBAL', 'S_COMMENT'],
+        "type": [3, 1, 1, 3, 1, 1, 0]
     }
 }
 
 
 def ParseRawData(folder_name, table_name, comment_flag=0):
-    file_path = os.path.join(folder_name, table_name + ".tbl")
+    file_path = os.path.join(folder_name, table_name.split("_")[0] + ".tbl")
     raw_data = pd.read_csv(file_path, sep="|", header=None)
     if comment_flag:
         raw_data = raw_data.drop(columns=raw_data.columns[-1])
