@@ -43,14 +43,9 @@ def test_storage_size(folder_list, tb_list):
     EMM_V_size = []
     EDX_size = []
 
-    size_list = list(map(partial(atom_process_task,
-                                 tb_list=tb_list), folder_list))
-
-    """
     with Pool() as p:
         size_list = p.map(partial(atom_process_task,
                                   tb_list=tb_list), folder_list)
-    """
 
     for size_tuple in size_list:
         disk_size_fdb.append(size_tuple[0])

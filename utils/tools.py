@@ -488,6 +488,10 @@ class BFF(object):
         # print(aes_dec(K_1, vt))
         # print(rt == vt)
 
+    def resolve_position(self, query_label, segment_num, segment_range):
+        # key, segment_num, segment_range):
+        return self.__hashfunc__(query_label, segment_num, segment_range)
+
     def calculate(self, poslist):
         pass
 

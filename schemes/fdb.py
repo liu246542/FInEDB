@@ -112,6 +112,20 @@ class Client(object):
             return (emm, filter_emm)
         return emm
 
+    def gen_token(self, query_tuple, table_name):
+        tk1 = []
+        for select_att in query_tuple["Select"]:
+            K_v = prf_256(self.SK.K_T, table_name)
+            query_label = str(prf_256(K_v, select_att + "SELECT"))
+            bff = BFF()
+            tk1.append(bff.resolve_position(query_label))
+
+        for where_att, where_val in zip(query_tuple["Where"],
+                                        query_tuple["value"]):
+            tk2 = []
+            K_v = prf_256(self.SK.K_T, table_name)
+            # query_label =
+
 
 if __name__ == '__main__':
     ct = Client()
