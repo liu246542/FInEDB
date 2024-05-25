@@ -7,6 +7,7 @@ import json
 import hashlib
 import pandas as pd
 from .TDAG import TDAG
+from collections import namedtuple
 from charm.toolbox.symcrypto import SymmetricCryptoAbstraction
 from charm.core.math.integer import randomBits
 from queue import LifoQueue
@@ -153,6 +154,8 @@ DB_STRUCTION = {
     }
 }
 
+BFF_INFO = namedtuple("BFF_INFO", ["nonce", "number", "length", "totalnum"])
+
 
 def ParseRawData(folder_name, table_name, comment_flag=0):
     file_path = os.path.join(folder_name, table_name.split("_")[0] + ".tbl")
@@ -231,6 +234,13 @@ def bxor(b1, b2):
     # print(len(b2))
     assert len(b1) == len(b2)
     return bytes(x ^ y for x, y in zip(b1, b2))
+
+
+def bxor2(b1, b2):
+    if b1 == 0:
+        return b2
+    assert len(b1) == len(b2)
+    return b1 ^ b2
 
 
 def hash_to_fixsize(bytesize, content):
@@ -401,6 +411,9 @@ class BFF(object):
         # segment_range = math.ceil(1.5 * label_num / self.hash_num)
         N = segment_range * segment_num  # N is the length of the filter
 
+        self.bff_info = BFF_INFO(self.nonce, segment_num,
+                                 segment_range, label_num)
+
         # print(f"segment range is {segment_range}")
         # print(f"segment number is {segment_num}")
         # print(f"total element num is {label_num}")
@@ -451,7 +464,7 @@ class BFF(object):
                 # print(self.__hashfunc__(error_pos[0], segment_range))
                 # print(self.__hashfunc__(error_pos[1], segment_range))
                 # raise RuntimeError("Fail to initialize BFF")
-                return (0, [], {})
+                return (0, [], {}, ())
 
         fuse_filter = [0 for i in range(N)]  # Initialize a binary fuse filter
 
@@ -477,7 +490,7 @@ class BFF(object):
             fuse_filter[single_pos[0]] = xor_value
         # print("Done!")
         # return fuse_filter
-        return [1, fuse_filter, temp_inverted_index]
+        return [1, fuse_filter, temp_inverted_index, self.bff_info]
 
         # verify correctness
         # test_label = "L_SUPPKEYSELECT"

@@ -2,9 +2,11 @@
 
 import pickle
 from collections import namedtuple
-from utils.tools import gen_key, prf_256, BFF, ParseRawData
+from utils.tools import gen_key, prf_256, BFF, ParseRawData, bxor, bxor2, prf_any
 from utils.REMM import REMM
 from utils import TDAG
+from bitarray import bitarray
+from bitarray import util as bitutil
 
 SecretKey = namedtuple("SecretKey", ["K_T", "K_S", "K_J"])
 
@@ -49,6 +51,7 @@ class Client(object):
         inverted_index = {}
         if test_flag:
             filter_dict = {}  # only for test, not need in Scheme
+        bff_dict = {}  # also only for test, but without test_flag
         remm = REMM()
         K_J = self.SK.K_J
         for table_info in self.Raw_Tables:
@@ -89,12 +92,15 @@ class Client(object):
                                                      self.SK.K_T,
                                                      t_data.columns,
                                                      t_type, Node_Index)
-                            (flag, value, tdict) = bff_rest
+                            (flag, value, tdict, bff_info) = bff_rest
                             # here, value is a filter
                             if flag == 1:
                                 break
                         if flag == 0:
                             raise RuntimeError(f"Cannot Initialize BFF")
+                        # temp_id = t_name + "_id" + str(row_dict["_id"])
+                        temp_id = t_name + "_id"
+                        bff_dict.setdefault(temp_id, bff_info),
                         inverted_index.update(tdict)
                         if test_flag:
                             filter_dict.setdefault(label, [])
@@ -107,24 +113,60 @@ class Client(object):
                     inverted_index.setdefault(label, [])
                     inverted_index[label].append(value)
         emm = remm.setup(inverted_index, self.SK.K_T)
+        self.bff_dict = bff_dict
         if test_flag:
             filter_emm = remm.setup(filter_dict, self.SK.K_T)
             return (emm, filter_emm)
         return emm
 
     def gen_token(self, query_tuple, table_name):
-        tk1 = []
-        for select_att in query_tuple["Select"]:
+        q1_label = query_tuple.Where[0] + str(query_tuple.Value[0])
+        stag = prf_256(self.SK.K_T, q1_label)
+        tk1 = stag
+
+        tk3 = []
+        bff_info = self.bff_dict.get(table_name + "_id")
+        N = bff_info.length * bff_info.number
+        bff = BFF()
+        for select_att in query_tuple.Select:
+            init_select = bitutil.zeros(N)
             K_v = prf_256(self.SK.K_T, table_name)
             query_label = str(prf_256(K_v, select_att + "SELECT"))
-            bff = BFF()
-            tk1.append(bff.resolve_position(query_label))
+            pos_list = bff.resolve_position(query_label,
+                                            bff_info.length,
+                                            bff_info.number)
+            for p in pos_list:
+                init_select[p] = 1
+            tk3.append(bitutil.sc_encode(init_select))
+            """
+            tk3.append(bff.resolve_position(query_label,
+                                            bff_info.length,
+                                            bff_info.number))
+            """
 
-        for where_att, where_val in zip(query_tuple["Where"],
-                                        query_tuple["value"]):
-            tk2 = []
+        tk2 = []
+        sum_where = 0
+        sum_val = 0
+        for where_att, where_val in zip(query_tuple.Where,
+                                        query_tuple.Value):
+            init_where = bitutil.zeros(N)
+
             K_v = prf_256(self.SK.K_T, table_name)
+            query_label = str(prf_256(K_v, where_att + "WHERE"))
+            bff = BFF()
+            pos_list = bff.resolve_position(query_label,
+                                            bff_info.length,
+                                            bff_info.number)
             # query_label =
+            for p in pos_list:
+                init_where[p] = 1
+            sum_where = bxor2(sum_where, init_where)
+
+            init_val = prf_any(K_v, str(where_val), 4)
+            sum_val = bxor(sum_val, init_val)
+
+            tk2.append((bitutil.sc_encode(sum_where), sum_val))
+        return (tk1, tk2, tk3)
 
 
 if __name__ == '__main__':
