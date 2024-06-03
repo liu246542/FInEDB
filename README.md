@@ -3,7 +3,7 @@
 ## To-do list
 
 - [x] Parse `.tbl` to `dict`
-- [ ] Parse `dict` to `index`
-- [ ] Implement Scheme FInEDB
-- [ ] Implement Scheme SPX
+- [x] Parse `dict` to `index`
+- [x] Implement Scheme FInEDB
+- [x] Implement Scheme SPX
 - [ ] Implement Scheme JXT

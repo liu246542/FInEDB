@@ -269,13 +269,16 @@ class BFF(object):
     So it is faster than XOR Filter to find a singleton.
     """
 
-    def __init__(self, hash_num=3):
+    def __init__(self, hash_num=3, nonce=None):
         # Set default number of hash functions as 3 (i.e., 3-wise)
         self.hash_num = hash_num
         # self.segment_range = segment_range
         # self.segment_num = segment_num
         # self.nonce = str(gen_key(32))
-        self.nonce = str(gen_key(8))
+        if nonce is None:
+            self.nonce = str(gen_key(8))
+        else:
+            self.nonce = nonce
 
     def __hashfunc__(self, key, segment_num, segment_range):
         pos_list = []
