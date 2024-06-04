@@ -91,7 +91,7 @@ def test_storage_size(folder_list, tb_list):
 if __name__ == '__main__':
     # "../data/sf0.001", "../data/sf0.002", "../data/sf0.003",
     # test_folder = ["../data/sf0.005"]
-    test_folder = ["../data/sf0.005"]
+    test_folder = ["../data/sf0.001"]
     # "../data/sf0.002", "../data/sf0.003",
                    # "../data/sf0.004", "../data/sf0.005", "../data/sf0.006",
                    # "../data/sf0.007", "../data/sf0.008", "../data/sf0.009"]
@@ -100,9 +100,22 @@ if __name__ == '__main__':
     # rg_tb_list = ["lineitem_rg"]
     tb_list = ["customer", "lineitem", "nation", "orders",
                "part", "partsupp", "region", "supplier"]
-    # tb_list = ["region"]
+    tb_list = ["customer"]
 
     ct_fdb = fdb.Client()
     ct_fdb.load_tables(test_folder[0], tb_list)
-    emm = ct_fdb.construct_index()
-    print(len(pickle.dumps(emm, -1)))
+    emm = ct_fdb.construct_index(test_flag=1)
+    ct_fdb.bff_test()
+    raise RuntimeError("break")
+    # print(len(pickle.dumps(emm, -1)))
+    # print(ct_fdb.bff_dict)
+    sv_fdb = fdb.Server(emm)
+
+    select_att = ["_id"]
+    where_att = ["C_NATIONKEY"]
+    value_list = ["3"]
+    query_tuple = SQL_Query(select_att, where_att, value_list)
+
+    tk = ct_fdb.gen_token(query_tuple, "customer")
+    print(tk)
+    sv_fdb.query_stag(tk[0])

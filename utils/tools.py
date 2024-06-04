@@ -230,6 +230,8 @@ def aes_dec(key, cryptext):
 def bxor(b1, b2):
     if b1 == 0:
         return b2
+    if b2 == 0:
+        return b1
     # print(len(b1))
     # print(len(b2))
     assert len(b1) == len(b2)
@@ -314,6 +316,8 @@ class BFF(object):
         temp_p2lable = {}
         temp_inverted_index = {}
 
+        debug_mode = False
+
         # self.temp_dict = {}
 
         # with Pool() as p:
@@ -324,7 +328,7 @@ class BFF(object):
 
             # att + "SELECT" => enc(K_1, dict_data[att])
             label = att + "SELECT"
-            label = str(prf_256(K_2, label))
+            # label = str(prf_256(K_2, label))
             """
             value = bytes(aes_enc(K_1, str(dict_data[att])), "utf-8")
             # assert len(value) == 97
@@ -351,9 +355,13 @@ class BFF(object):
 
                 # att + "WHERE" => PRF(K_2, dict_data[att])
                 label = att + "WHERE"
-                label = str(prf_256(K_2, label))
+                # label = str(prf_256(K_2, label))
                 # value = prf_256(K_2, str(dict_data[att]))
                 value = prf_any(K_2, str(dict_data[att]), 4)
+                if att == "_id" and dict_data[att] == 2:
+                    debug_mode = True
+                    print(f"the label is {label}")
+                    print(f"the value is {value}")
                 assert len(value) == 4
                 # Padding to 128 Bytes with zeros
                 # value = value.ljust(128, b"0")
@@ -368,7 +376,7 @@ class BFF(object):
                 for n in list(node_set):
                     label = n + att + "node"
                     # label = str(prf_256(K_2, gen_key(1024)))
-                    label = str(prf_256(K_2, label))
+                    # label = str(prf_256(K_2, label))
                     # value = prf_256(K_2, n)
                     value = prf_any(K_2, n, 4)
                     assert len(value) == 4
@@ -448,28 +456,22 @@ class BFF(object):
                     continue
             post_len = len(can_pos)
             if prev_len == post_len:
-                print(f"segment range is {segment_range}")
-                print(f"segment number is {segment_num}")
-                print(f"total element num is {label_num}")
-                # print(len(temp_dict.keys()))
-                # print(len(set(temp_dict.keys())))
-                # print(label_num)
-                # print(segment_range * self.hash_num)
-                # print(N)
-                # print(temp_dict.keys())
-                # print(dict_data.get("_id"))
-                print(can_pos)
-                print([len(temp_p2lable.get(x)) for x in can_pos])
-                # print(temp_p2lable.get(can_pos[0]))
-                # x = [temp_p2lable.get(x) for x in can_pos]
-                # print(x)
-                # error_pos = temp_p2lable.get(can_pos[0])
-                # print(self.__hashfunc__(error_pos[0], segment_range))
-                # print(self.__hashfunc__(error_pos[1], segment_range))
-                # raise RuntimeError("Fail to initialize BFF")
+                # ----------------DEBUG----------------
+                # print(f"segment range is {segment_range}")
+                # print(f"segment number is {segment_num}")
+                # print(f"total element num is {label_num}")
+                # print(can_pos)
+                # print([len(temp_p2lable.get(x)) for x in can_pos])
+                # ----------------DEBUG----------------
                 return (0, [], {}, ())
 
         fuse_filter = [0 for i in range(N)]  # Initialize a binary fuse filter
+
+        if debug_mode:
+            print("-" * 10)
+            print(temp_hash.get("_id" + "WHERE"))
+            print(self.bff_info)
+            print("-" * 10)
 
         for i in range(label_stack.qsize()):
             label = label_stack.get()

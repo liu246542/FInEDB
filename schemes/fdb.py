@@ -7,6 +7,7 @@ from utils.tools import gen_key, prf_256, BFF,\
 from utils.REMM import REMM
 from utils import TDAG
 from bitarray import util as bitutil
+from functools import reduce
 
 SecretKey = namedtuple("SecretKey", ["K_T", "K_S", "K_J"])
 
@@ -136,9 +137,40 @@ class Client(object):
         self.bff_dict = bff_dict
         self.tdag_dict = tdag_dict
         if test_flag:
+            self.filter_dict = filter_dict
             filter_emm = remm.setup(filter_dict, self.SK.K_T)
             return (emm, filter_emm)
         return emm
+
+    def gen_stag(self, query_test, table_name):
+        stag = prf_256(self.SK.K_T, query_test)
+        print(stag)
+
+    def bff_test(self):
+        label = "_id" + "WHERE"
+        bff_info = self.bff_dict.get("customer")
+        bff = BFF(nonce=bff_info.nonce)
+        pos_list = bff.resolve_position(label, bff_info.number,
+                                        bff_info.length)
+        test_filter = self.filter_dict.get("customer" + "_id" + "2")
+        # t_name + "_id" + str(row_dict["_id"])
+        print(bff_info)
+        print(test_filter)
+        print(pos_list)
+        N = bff_info.length * bff_info.number
+        init_select = bitutil.zeros(N)
+        for p in pos_list:
+            init_select[p] = 1
+        print(init_select)
+
+        choose_filter = [x for x, y in zip(test_filter[0], init_select) if y == 1]
+        print(choose_filter)
+        sum_test = reduce(bxor, choose_filter)
+        print(sum_test)
+
+        K_v = prf_256(self.SK.K_T, "customer")
+        test_value = prf_any(K_v, "2", 4)
+        print(test_value)
 
     def gen_token(self, query_tuple, table_name):
         q1_label = query_tuple.Where[0] + str(query_tuple.Value[0])
@@ -152,7 +184,8 @@ class Client(object):
         for select_att in query_tuple.Select:
             init_select = bitutil.zeros(N)
             K_v = prf_256(self.SK.K_T, table_name)
-            query_label = str(prf_256(K_v, select_att + "SELECT"))
+            # query_label = str(prf_256(K_v, select_att + "SELECT"))
+            query_label = select_att + "SELECT"
             pos_list = bff.resolve_position(query_label,
                                             bff_info.length,
                                             bff_info.number)
@@ -160,7 +193,7 @@ class Client(object):
                 init_select[p] = 1
             tk3.append(bitutil.sc_encode(init_select))
 
-        tk2 = []
+        # tk2 = []
         sum_where = 0
         sum_val = 0
         for where_att, where_val in zip(query_tuple.Where,
@@ -168,8 +201,9 @@ class Client(object):
             init_where = bitutil.zeros(N)
 
             K_v = prf_256(self.SK.K_T, table_name)
-            query_label = str(prf_256(K_v, where_att + "WHERE"))
-            bff = BFF()
+            # query_label = str(prf_256(K_v, where_att + "WHERE"))
+            query_label = where_att + "WHERE"
+            # bff = BFF(bff_info.nonce)
             pos_list = bff.resolve_position(query_label,
                                             bff_info.length,
                                             bff_info.number)
@@ -181,8 +215,46 @@ class Client(object):
             init_val = prf_any(K_v, str(where_val), 4)
             sum_val = bxor(sum_val, init_val)
 
-            tk2.append((bitutil.sc_encode(sum_where), sum_val))
+            # tk2.append((bitutil.sc_encode(sum_where), sum_val))
+        tk2 = (bitutil.sc_encode(sum_where), sum_val)
         return (tk1, tk2, tk3)
+
+
+class Server(object):
+    """docstring for Server
+    """
+
+    def __init__(self, emm):
+        self.emm = emm
+
+    def query(self, tklist):
+        (tk1, tk2, tk3) = tklist
+
+        remm = REMM()
+        res1 = remm.query(self.emm, tk1)
+
+        # tk2[0]
+        choose_list = bitutil.sc_decode(tk2[0])
+        bff_candica = []
+        # tk2[1]
+        for bff in res1:
+            choose_filter = [x for x, y in zip(bff, choose_list) if y == 1]
+            sum_val = reduce(bxor, choose_filter)
+            print(sum_val)
+            if sum_val == tk2[1]:
+                bff_candica.append(bff)
+        print(bff_candica)
+
+        select_list = bitutil.sc_decode(tk3[0])
+        for bff in res1:
+            select_filter = [x for x, y in zip(bff, select_list) if y == 1]
+            sum_val = reduce(bxor, select_filter)
+            print(sum_val)
+
+    def query_stag(self, stag, recursive=1):
+        remm = REMM()
+        res = remm.query(self.emm, stag, recursive)
+        print(res)
 
 
 if __name__ == '__main__':
