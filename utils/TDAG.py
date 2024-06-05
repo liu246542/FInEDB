@@ -1,7 +1,5 @@
 #!/usr/bin/python3
 
-import pprint
-# from tools import ParseRawData
 from collections import namedtuple
 
 
@@ -53,7 +51,6 @@ class TDAG(object):
                 cover_range = [binstr2int(x) for x in
                                [name.ljust(self.height, "0"),
                                 name.ljust(self.height, "1")]]
-                # c_name = f"N_({cover_range[0]}, {cover_range[1]})"
                 if i == self.height:
                     child_nodes = []
                     cover_range = [cover_range[0]]
@@ -62,17 +59,13 @@ class TDAG(object):
                     parent_node = []
                     child_nodes = ["0", "1"]
                     cover_range = [0, 2 ** self.height - 1]
-                    # c_name = "root"
                 if i == 1:
                     parent_node = ["root"]
                 node_def = Node(name, child_nodes, parent_node, cover_range, i)
-                # node_def = Node(c_name, child_nodes, parent_node, cover_range, i)
                 level_nodes.append(node_def)
             Tree_Nodes.setdefault(i, level_nodes)
-        # pprint.pprint(Tree_Nodes)
 
         for i in range(1, self.height):
-            # pprint.pprint(Tree_Nodes.get(i))
             node_list = Tree_Nodes.get(i)
             level_nodes = []
             for j in range(len(node_list) - 1):
@@ -88,7 +81,6 @@ class TDAG(object):
                 node_list_next[2 * j + 1].p_node.append(name)
                 node_list_next[2 * j + 2].p_node.append(name)
             Tree_Nodes[i].extend(level_nodes)
-        # pprint.pprint(Tree_Nodes)
 
         Node_Dict = {}
 
@@ -106,18 +98,16 @@ class TDAG(object):
                 Multi_Maps.setdefault(name_index, [value])
                 for label in parent_node:
                     Multi_Maps.setdefault(label, Node_Dict.get(label).c_node)
-                # return Multi_Maps
             else:
                 parent_node.append(name_index)
                 for label in parent_node:
                     Multi_Maps.setdefault(label, [])
                     Multi_Maps.get(label).append(value)
-        # pprint.pprint(len(Multi_Maps.keys()))
-        # pprint.pprint(Multi_Maps)
         return (Multi_Maps, Node_Dict)
 
 
 if __name__ == '__main__':
+    from tools import ParseRawData
     # Raw_Data = ParseRawData("../data/sf0.01", "orders")
     Raw_Data = ParseRawData("../data/sf0.01", "nation")
     (t_name, t_data, t_type) = Raw_Data

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import random
-from .tools import prf_256, hash_to_fixsize, bxor
+from .tools import prf_256, prf_any, hash_to_fixsize, bxor
 
 
 class REMM(object):
@@ -29,7 +29,6 @@ class REMM(object):
     def setup(self, index_dict, K_T):
         self.S = self.__count_S__(index_dict, K_T)
         free_list = [list(range(self.S)) for i in range(self.B)]
-        # self.emm = [[(0, 0) for j in range(self.S)] for i in range(self.B)]
         emm = [[(0, 0) for j in range(self.S)] for i in range(self.B)]
 
         for label in index_dict.keys():
@@ -47,14 +46,10 @@ class REMM(object):
                 emm[b][b_pos] = (L, c)
             else:
                 for i, j in enumerate(value):
-                    # assert isinstance(j, str)
-                    # print(type(j))
-                    # print(i)
-                    # print(label)
-                    # print(value[0:3])
                     enc_value = prf_256(K_T, j)
                     if isinstance(j, bytes):
-                        # enc_value = prf_256(K_T, j)
+                        # stag = label
+                        stag = prf_any(K_T, label, 4)
                         enc_value = j
                     stag_count = stag + str(i).encode()
                     b = int.from_bytes(hash_to_fixsize(1, stag_count),
@@ -87,26 +82,17 @@ class REMM(object):
                     check_flag = True
                     res.append(v[1])
                     beta = b"0"
-                    # return res
-                    # return v[1]
                 elif v[0] == L:
                     check_flag = True
                     K = hash_to_fixsize(len(v[1]), stag_count)
                     m = bxor(K, v[1])
-                    # print(m)
                     beta = m[0:1]
                     tk_prime = m[1:]
-                    # print(beta)
 
                     if recursive:
                         res.extend(self.query(emm, tk_prime))
                     else:
                         res.append(tk_prime)
-                    # if beta == b"0":
-                    # res.append(tk_prime)
-                    # else:
-                    # res.append(self.query(emm, tk_prime))
-                    # res.append(tk_prime)
             if check_flag is False:
                 raise RuntimeError("Wrong stag ?")
             #  --------------------------------------------

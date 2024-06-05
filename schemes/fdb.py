@@ -3,7 +3,7 @@
 import pickle
 from collections import namedtuple
 from utils.tools import gen_key, prf_256, BFF,\
-    ParseRawData, bxor, bxor2, prf_any
+    ParseRawData, bxor, bxor2, prf_any, aes_dec
 from utils.REMM import REMM
 from utils import TDAG
 from bitarray import util as bitutil
@@ -72,8 +72,8 @@ class Client(object):
         inverted_index = {}
         if test_flag:
             filter_dict = {}  # only for test, not need in Scheme
-        bff_dict = {}  # store in the client's side
-        tdag_dict = {}  # store in the client's side
+        bff_dict = {}  # store on the client's side
+        tdag_dict = {}  # store on the client's side
         remm = REMM()
         K_J = self.SK.K_J
         for table_info in self.Raw_Tables:
@@ -105,7 +105,7 @@ class Client(object):
             K_v = prf_256(self.SK.K_T, t_name)  # K_2
 
             # Integrate Binary Fuse filters
-            # Start -----------------------
+            # Start -----------------------||||||||||||||||||||||
             for i in range(100):
                 f = self.__gen_bff__(table_info, (K_e, K_v, K_J),
                                      Node_Index)
@@ -119,7 +119,7 @@ class Client(object):
             if test_flag:
                 filter_dict.update(f[0])
             # raise RuntimeError("break")
-            # End -------------------------
+            # End -------------------------||||||||||||||||||||||
 
             for row in t_data.iterrows():
                 row_dict = row[1].to_dict()
@@ -142,56 +142,14 @@ class Client(object):
             return (emm, filter_emm)
         return emm
 
-    def gen_stag(self, query_test, table_name):
-        stag = prf_256(self.SK.K_T, query_test)
-        print(stag)
-
-    def bff_test(self):
-        label = "_id" + "WHERE"
-        bff_info = self.bff_dict.get("customer")
-        bff = BFF(nonce=bff_info.nonce)
-        pos_list = bff.resolve_position(label, bff_info.number,
-                                        bff_info.length)
-        test_filter = self.filter_dict.get("customer" + "_id" + "2")
-        # t_name + "_id" + str(row_dict["_id"])
-        print(bff_info)
-        print(test_filter)
-        print(pos_list)
-        N = bff_info.length * bff_info.number
-        init_select = bitutil.zeros(N)
-        for p in pos_list:
-            init_select[p] = 1
-        print(init_select)
-
-        choose_filter = [x for x, y in zip(test_filter[0], init_select) if y == 1]
-        print(choose_filter)
-        sum_test = reduce(bxor, choose_filter)
-        print(sum_test)
-
-        K_v = prf_256(self.SK.K_T, "customer")
-        test_value = prf_any(K_v, "2", 4)
-        print(test_value)
-
     def gen_token(self, query_tuple, table_name):
         q1_label = query_tuple.Where[0] + str(query_tuple.Value[0])
         stag = prf_256(self.SK.K_T, q1_label)
         tk1 = stag
 
-        tk3 = []
         bff_info = self.bff_dict.get(table_name)
         N = bff_info.length * bff_info.number
         bff = BFF(nonce=bff_info.nonce)
-        for select_att in query_tuple.Select:
-            init_select = bitutil.zeros(N)
-            K_v = prf_256(self.SK.K_T, table_name)
-            # query_label = str(prf_256(K_v, select_att + "SELECT"))
-            query_label = select_att + "SELECT"
-            pos_list = bff.resolve_position(query_label,
-                                            bff_info.length,
-                                            bff_info.number)
-            for p in pos_list:
-                init_select[p] = 1
-            tk3.append(bitutil.sc_encode(init_select))
 
         # tk2 = []
         sum_where = 0
@@ -203,11 +161,10 @@ class Client(object):
             K_v = prf_256(self.SK.K_T, table_name)
             # query_label = str(prf_256(K_v, where_att + "WHERE"))
             query_label = where_att + "WHERE"
-            # bff = BFF(bff_info.nonce)
             pos_list = bff.resolve_position(query_label,
-                                            bff_info.length,
-                                            bff_info.number)
-            # query_label =
+                                            bff_info.number,
+                                            bff_info.length
+                                            )
             for p in pos_list:
                 init_where[p] = 1
             sum_where = bxor2(sum_where, init_where)
@@ -215,9 +172,29 @@ class Client(object):
             init_val = prf_any(K_v, str(where_val), 4)
             sum_val = bxor(sum_val, init_val)
 
-            # tk2.append((bitutil.sc_encode(sum_where), sum_val))
         tk2 = (bitutil.sc_encode(sum_where), sum_val)
+
+        tk3 = []
+        for select_att in query_tuple.Select:
+            init_select = bitutil.zeros(N)
+            K_v = prf_256(self.SK.K_T, table_name)
+            # query_label = str(prf_256(K_v, select_att + "SELECT"))
+            query_label = select_att + "SELECT"
+            pos_list = bff.resolve_position(query_label,
+                                            bff_info.number,
+                                            bff_info.length
+                                            )
+            for p in pos_list:
+                init_select[p] = 1
+            tk3.append(bitutil.sc_encode(init_select))
         return (tk1, tk2, tk3)
+
+    def decrypt_res(self, enc_res, table_name):
+        k_e = prf_256(self.SK.K_S, table_name)
+        fin_res = []
+        for enc_column in enc_res:
+            fin_res.append([aes_dec(k_e, x[0]) for x in enc_column])
+        return fin_res
 
 
 class Server(object):
@@ -240,16 +217,20 @@ class Server(object):
         for bff in res1:
             choose_filter = [x for x, y in zip(bff, choose_list) if y == 1]
             sum_val = reduce(bxor, choose_filter)
-            print(sum_val)
             if sum_val == tk2[1]:
                 bff_candica.append(bff)
-        print(bff_candica)
 
         select_list = bitutil.sc_decode(tk3[0])
-        for bff in res1:
-            select_filter = [x for x, y in zip(bff, select_list) if y == 1]
-            sum_val = reduce(bxor, select_filter)
-            print(sum_val)
+        enc_res = []
+        for select_tk in tk3:
+            enc_column = []
+            select_list = bitutil.sc_decode(select_tk)
+            for bff in bff_candica:
+                select_filter = [x for x, y in zip(bff, select_list) if y == 1]
+                sum_val = reduce(bxor, select_filter)
+                enc_column.append(remm.query(self.emm, sum_val, 0))
+            enc_res.append(enc_column)
+        return enc_res
 
     def query_stag(self, stag, recursive=1):
         remm = REMM()
