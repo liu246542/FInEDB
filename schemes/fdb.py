@@ -2,9 +2,12 @@
 
 import pickle
 from collections import namedtuple
-from utils.tools import gen_key, prf_256, BFF, ParseRawData
+from utils.tools import gen_key, prf_256, BFF,\
+    ParseRawData, bxor, bxor2, prf_any, aes_dec
 from utils.REMM import REMM
 from utils import TDAG
+from bitarray import util as bitutil
+from functools import reduce
 
 SecretKey = namedtuple("SecretKey", ["K_T", "K_S", "K_J"])
 
@@ -38,17 +41,39 @@ class Client(object):
             self.SK = SK
 
     def load_tables(self, folder_name, table_name_list):
-        Raw_Tables = []
-        for table_name in table_name_list:
-            Raw_Tables.append(ParseRawData(folder_name, table_name, 1))
+        Raw_Tables = list(map(lambda x: ParseRawData(folder_name, x, 1),
+                              table_name_list))
         print("-" * 20 + "LOAD COMPLETE" + "-" * 20)
         self.Raw_Tables = Raw_Tables
+
+    def __gen_bff__(self, table_info, sk, Node_Index):
+        temp_dict = {}
+        temp_inverted_index = {}
+        (t_name, t_data, t_type) = table_info
+        (K_e, K_v, K_J) = sk
+        nonce = str(gen_key(8))
+        bff = BFF(nonce=nonce)
+        for row in t_data.iterrows():
+            row_dict = row[1].to_dict()
+            label = t_name + "_id" + str(row_dict["_id"])
+            bff_rest = bff.construct(row_dict, K_e, K_v, K_J,
+                                     self.SK.K_T, t_data.columns,
+                                     t_type, Node_Index)
+            (flag, value, tdict, bff_info) = bff_rest
+            if flag == 0:
+                return False
+            temp_dict.setdefault(label, [])
+            temp_dict[label].append(value)
+            temp_inverted_index.update(tdict)
+        return (temp_dict, temp_inverted_index, bff_info)
 
     def construct_index(self, test_flag=0):
         # Raw_Tables => inverted index (BFF inside)
         inverted_index = {}
         if test_flag:
             filter_dict = {}  # only for test, not need in Scheme
+        bff_dict = {}  # store on the client's side
+        tdag_dict = {}  # store on the client's side
         remm = REMM()
         K_J = self.SK.K_J
         for table_info in self.Raw_Tables:
@@ -63,6 +88,7 @@ class Client(object):
 
                     max_value = max(value_list)
                     tdag = TDAG.TDAG(max_value)
+                    tdag_dict.setdefault(t_name + attr, max_value)
                     (MM_range, node_dict) = tdag.construct(value_list)
 
                     for node_name in MM_range.keys():
@@ -77,28 +103,29 @@ class Client(object):
 
             K_e = prf_256(self.SK.K_S, t_name)  # K_1
             K_v = prf_256(self.SK.K_T, t_name)  # K_2
+
+            # Integrate Binary Fuse filters
+            # Start -----------------------||||||||||||||||||||||
+            for i in range(100):
+                f = self.__gen_bff__(table_info, (K_e, K_v, K_J),
+                                     Node_Index)
+                if f is not False:
+                    break
+                if i == 99 and f is False:
+                    raise RuntimeError("Fail to generate a BFF")
+            inverted_index.update(f[0])
+            inverted_index.update(f[1])
+            bff_dict.setdefault(t_name, f[2])
+            if test_flag:
+                filter_dict.update(f[0])
+            # raise RuntimeError("break")
+            # End -------------------------||||||||||||||||||||||
+
             for row in t_data.iterrows():
                 row_dict = row[1].to_dict()
                 for attr in t_data.columns:
                     if attr == "_id":
-                        label = t_name + attr + str(row_dict[attr])
-                        # label = prf_256(self.SK.K_T, label)
-                        for retry in range(100):
-                            bff = BFF()
-                            bff_rest = bff.construct(row_dict, K_e, K_v, K_J,
-                                                     self.SK.K_T,
-                                                     t_data.columns,
-                                                     t_type, Node_Index)
-                            (flag, value, tdict) = bff_rest
-                            # here, value is a filter
-                            if flag == 1:
-                                break
-                        if flag == 0:
-                            raise RuntimeError(f"Cannot Initialize BFF")
-                        inverted_index.update(tdict)
-                        if test_flag:
-                            filter_dict.setdefault(label, [])
-                            filter_dict[label].append(value)
+                        continue
                     else:
                         # For those attributes are not "_id"
                         label = attr + str(row_dict[attr])
@@ -107,24 +134,108 @@ class Client(object):
                     inverted_index.setdefault(label, [])
                     inverted_index[label].append(value)
         emm = remm.setup(inverted_index, self.SK.K_T)
+        self.bff_dict = bff_dict
+        self.tdag_dict = tdag_dict
         if test_flag:
+            self.filter_dict = filter_dict
             filter_emm = remm.setup(filter_dict, self.SK.K_T)
             return (emm, filter_emm)
         return emm
 
     def gen_token(self, query_tuple, table_name):
-        tk1 = []
-        for select_att in query_tuple["Select"]:
-            K_v = prf_256(self.SK.K_T, table_name)
-            query_label = str(prf_256(K_v, select_att + "SELECT"))
-            bff = BFF()
-            tk1.append(bff.resolve_position(query_label))
+        q1_label = query_tuple.Where[0] + str(query_tuple.Value[0])
+        stag = prf_256(self.SK.K_T, q1_label)
+        tk1 = stag
 
-        for where_att, where_val in zip(query_tuple["Where"],
-                                        query_tuple["value"]):
-            tk2 = []
+        bff_info = self.bff_dict.get(table_name)
+        N = bff_info.length * bff_info.number
+        bff = BFF(nonce=bff_info.nonce)
+
+        # tk2 = []
+        sum_where = 0
+        sum_val = 0
+        for where_att, where_val in zip(query_tuple.Where,
+                                        query_tuple.Value):
+            init_where = bitutil.zeros(N)
+
             K_v = prf_256(self.SK.K_T, table_name)
-            # query_label =
+            # query_label = str(prf_256(K_v, where_att + "WHERE"))
+            query_label = where_att + "WHERE"
+            pos_list = bff.resolve_position(query_label,
+                                            bff_info.number,
+                                            bff_info.length
+                                            )
+            for p in pos_list:
+                init_where[p] = 1
+            sum_where = bxor2(sum_where, init_where)
+
+            init_val = prf_any(K_v, str(where_val), 4)
+            sum_val = bxor(sum_val, init_val)
+
+        tk2 = (bitutil.sc_encode(sum_where), sum_val)
+
+        tk3 = []
+        for select_att in query_tuple.Select:
+            init_select = bitutil.zeros(N)
+            K_v = prf_256(self.SK.K_T, table_name)
+            # query_label = str(prf_256(K_v, select_att + "SELECT"))
+            query_label = select_att + "SELECT"
+            pos_list = bff.resolve_position(query_label,
+                                            bff_info.number,
+                                            bff_info.length
+                                            )
+            for p in pos_list:
+                init_select[p] = 1
+            tk3.append(bitutil.sc_encode(init_select))
+        return (tk1, tk2, tk3)
+
+    def decrypt_res(self, enc_res, table_name):
+        k_e = prf_256(self.SK.K_S, table_name)
+        fin_res = []
+        for enc_column in enc_res:
+            fin_res.append([aes_dec(k_e, x[0]) for x in enc_column])
+        return fin_res
+
+
+class Server(object):
+    """docstring for Server
+    """
+
+    def __init__(self, emm):
+        self.emm = emm
+
+    def query(self, tklist):
+        (tk1, tk2, tk3) = tklist
+
+        remm = REMM()
+        res1 = remm.query(self.emm, tk1)
+
+        # tk2[0]
+        choose_list = bitutil.sc_decode(tk2[0])
+        bff_candica = []
+        # tk2[1]
+        for bff in res1:
+            choose_filter = [x for x, y in zip(bff, choose_list) if y == 1]
+            sum_val = reduce(bxor, choose_filter)
+            if sum_val == tk2[1]:
+                bff_candica.append(bff)
+
+        select_list = bitutil.sc_decode(tk3[0])
+        enc_res = []
+        for select_tk in tk3:
+            enc_column = []
+            select_list = bitutil.sc_decode(select_tk)
+            for bff in bff_candica:
+                select_filter = [x for x, y in zip(bff, select_list) if y == 1]
+                sum_val = reduce(bxor, select_filter)
+                enc_column.append(remm.query(self.emm, sum_val, 0))
+            enc_res.append(enc_column)
+        return enc_res
+
+    def query_stag(self, stag, recursive=1):
+        remm = REMM()
+        res = remm.query(self.emm, stag, recursive)
+        print(res)
 
 
 if __name__ == '__main__':

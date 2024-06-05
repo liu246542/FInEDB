@@ -100,41 +100,22 @@ if __name__ == '__main__':
     # rg_tb_list = ["lineitem_rg"]
     tb_list = ["customer", "lineitem", "nation", "orders",
                "part", "partsupp", "region", "supplier"]
+    tb_list = ["customer"]
 
-    """
     ct_fdb = fdb.Client()
     ct_fdb.load_tables(test_folder[0], tb_list)
     emm = ct_fdb.construct_index(test_flag=1)
+    ct_fdb.bff_test()
+    raise RuntimeError("break")
+    # print(len(pickle.dumps(emm, -1)))
+    # print(ct_fdb.bff_dict)
+    sv_fdb = fdb.Server(emm)
 
-    # pprint(ct_fdb.bff_dict)
+    select_att = ["_id"]
+    where_att = ["C_NATIONKEY"]
+    value_list = ["3"]
+    query_tuple = SQL_Query(select_att, where_att, value_list)
 
-    query_tuple = gen_query(2, 3, test_folder[0], tb_list[0])
-    print(query_tuple.Select)
-
-    tk = ct_fdb.gen_token(query_tuple, tb_list[0])
-    pprint(tk)
-    print(len(pickle.dumps(tk, -1)))
-    """
-
-    ct_spx = spx.Client()
-    ct_spx.load_tables(test_folder[0], tb_list)
-    query_tuple = gen_query(2, 3, test_folder[0], tb_list[0])
-    print(query_tuple.Select)
-
-    tk = ct_spx.gen_query(query_tuple, tb_list[0])
-    pprint(tk)
-    print(len(pickle.dumps(tk, -1)))
-
-    """
-    test_result = test_storage_size(test_folder, tb_list)
-
-    data_frame = pd.DataFrame({
-        "Scale": [x.split("/")[2] for x in test_folder],
-        "Original Size": [Decimal(x / 1048576).quantize(Decimal("0.00"))
-                          for x in test_result[0]],
-        "Modified Size": [Decimal(x / 1048576).quantize(Decimal("0.00"))
-                          for x in test_result[1]],
-        "Ratio": test_result[2]
-    })
-    print(data_frame)
-    """
+    tk = ct_fdb.gen_token(query_tuple, "customer")
+    print(tk)
+    sv_fdb.query_stag(tk[0])

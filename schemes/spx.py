@@ -151,6 +151,18 @@ class Client(object):
         # with open("./DUMPs/spx_r.pkl", "wb") as f:
             # pickle.dump((EMM_R, EMM_C, EMM_V), f)
 
+    def gen_token(self, query_tuple, table_name):
+        STE = TSet()
+        ptk = []
+        itk = []
+        for select_att in query_tuple.Select:
+            ptk.append(STE.gen_token(select_att, self.SK.K_C))
+        for where_att, where_val in zip(query_tuple.Where,
+                                        query_tuple.Value):
+            itk.append(STE.gen_token(where_att + str(where_val),
+                                     self.SK.K_V))
+        return (ptk, itk)
+
 
 if __name__ == '__main__':
     ct = Client()
