@@ -101,8 +101,9 @@ class Client(object):
 
                     Node_Index.setdefault(attr, (node_dict, max_value))
 
-            K_e = prf_256(self.SK.K_S, t_name)  # K_1
-            K_v = prf_256(self.SK.K_T, t_name)  # K_2
+            K_e = prf_256(self.SK.K_S, t_name + "0")  # K_1
+            # K_v = prf_256(self.SK.K_T, t_name)  # K_2
+            K_v = prf_256(self.SK.K_S, t_name + "1")  # K_2
 
             # Integrate Binary Fuse filters
             # Start -----------------------||||||||||||||||||||||
@@ -158,7 +159,8 @@ class Client(object):
                                         query_tuple.Value):
             init_where = bitutil.zeros(N)
 
-            K_v = prf_256(self.SK.K_T, table_name)
+            # K_v = prf_256(self.SK.K_T, table_name)
+            K_v = prf_256(self.SK.K_S, table_name + "1")
             # query_label = str(prf_256(K_v, where_att + "WHERE"))
             query_label = where_att + "WHERE"
             pos_list = bff.resolve_position(query_label,
@@ -177,7 +179,8 @@ class Client(object):
         tk3 = []
         for select_att in query_tuple.Select:
             init_select = bitutil.zeros(N)
-            K_v = prf_256(self.SK.K_T, table_name)
+            # K_v = prf_256(self.SK.K_T, table_name)
+            K_v = prf_256(self.SK.K_S, table_name + "1")
             # query_label = str(prf_256(K_v, select_att + "SELECT"))
             query_label = select_att + "SELECT"
             pos_list = bff.resolve_position(query_label,
@@ -190,7 +193,8 @@ class Client(object):
         return (tk1, tk2, tk3)
 
     def decrypt_res(self, enc_res, table_name):
-        k_e = prf_256(self.SK.K_S, table_name)
+        # k_e = prf_256(self.SK.K_S, table_name)
+        k_e = prf_256(self.SK.K_S, table_name + "0")
         fin_res = []
         for enc_column in enc_res:
             fin_res.append([aes_dec(k_e, x[0]) for x in enc_column])

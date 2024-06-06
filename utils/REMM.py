@@ -19,8 +19,12 @@ class REMM(object):
         pos_record = {}
         for label in index_dict.keys():
             stag = prf_256(K_T, label)
-            for i, _ in enumerate(index_dict.get(label)):
-                pos_b = hash_to_fixsize(1, stag + str(i).encode())
+            for i, j in enumerate(index_dict.get(label)):
+                if isinstance(j, bytes):
+                    stag = prf_any(K_T, label, 4)
+                stag_count = stag + str(i).encode()
+                pos_b = int.from_bytes(hash_to_fixsize(1, stag_count),
+                                       byteorder="big")
                 counter = pos_record.setdefault(pos_b, 0)
                 counter += 1
                 pos_record[pos_b] = counter
@@ -94,6 +98,7 @@ class REMM(object):
                     else:
                         res.append(tk_prime)
             if check_flag is False:
+                # Avoid infinite loop
                 raise RuntimeError("Wrong stag ?")
             #  --------------------------------------------
             i += 1
