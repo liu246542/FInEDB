@@ -112,7 +112,7 @@ if __name__ == '__main__':
                    "../data/sf0.007", "../data/sf0.008",
                    "../data/sf0.009", "../data/sf0.01"]
 
-    # test_folder = ["../data/sf0.007", "../data/sf0.008"]
+    # test_folder = ["../data/sf0.001"]
     tb_list = ["lineitem"]
     """
     tb_list = ["customer", "lineitem", "nation", "orders",

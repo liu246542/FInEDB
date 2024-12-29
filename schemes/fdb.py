@@ -52,8 +52,9 @@ class Client(object):
         (t_name, t_data, t_type) = table_info
         (K_e, K_v, K_J) = sk
         nonce = str(gen_key(8))
-        bff = BFF(nonce=nonce)
+        # bff = BFF(nonce=nonce)
         for row in t_data.iterrows():
+            bff = BFF()
             row_dict = row[1].to_dict()
             label = t_name + "_id" + str(row_dict["_id"])
             bff_rest = bff.construct(row_dict, K_e, K_v, K_J,
@@ -91,6 +92,7 @@ class Client(object):
                     tdag_dict.setdefault(t_name + attr, max_value)
                     (MM_range, node_dict) = tdag.construct(value_list)
 
+                    """
                     for node_name in MM_range.keys():
                         v_list = MM_range.get(node_name)
 
@@ -98,6 +100,7 @@ class Client(object):
                         value = [t_name + attr + str(x) for x in v_list]
 
                         inverted_index.setdefault(label, value)
+                    """
 
                     Node_Index.setdefault(attr, (node_dict, max_value))
 
@@ -107,18 +110,18 @@ class Client(object):
 
             # Integrate Binary Fuse filters
             # Start -----------------------||||||||||||||||||||||
-            for i in range(100):
-                f = self.__gen_bff__(table_info, (K_e, K_v, K_J),
-                                     Node_Index)
-                if f is not False:
-                    break
-                if i == 99 and f is False:
-                    raise RuntimeError("Fail to generate a BFF")
-            inverted_index.update(f[0])
-            inverted_index.update(f[1])
-            bff_dict.setdefault(t_name, f[2])
-            if test_flag:
-                filter_dict.update(f[0])
+            # for i in range(100):
+            #     f = self.__gen_bff__(table_info, (K_e, K_v, K_J),
+            #                          Node_Index)
+            #     if f is not False:
+            #         break
+            #     if i == 99 and f is False:
+            #         raise RuntimeError("Fail to generate a BFF")
+            # inverted_index.update(f[0])
+            # inverted_index.update(f[1])
+            # bff_dict.setdefault(t_name, f[2])
+            # if test_flag:
+            #     filter_dict.update(f[0])
             # raise RuntimeError("break")
             # End -------------------------||||||||||||||||||||||
 
@@ -126,7 +129,28 @@ class Client(object):
                 row_dict = row[1].to_dict()
                 for attr in t_data.columns:
                     if attr == "_id":
-                        continue
+                        # continue
+                        label = t_name + attr + str(row_dict[attr])
+                        # label = prf_256(self.SK.K_T, label)
+                        for retry in range(100):
+                            bff = BFF()
+                            bff_rest = bff.construct(row_dict, K_e, K_v, K_J,
+                                                     self.SK.K_T,
+                                                     t_data.columns,
+                                                     t_type, Node_Index)
+                            (flag, value, tdict, bff_info) = bff_rest
+                            # here, value is a filter
+                            if flag == 1:
+                                break
+                        if flag == 0:
+                            raise RuntimeError(f"Cannot Initialize BFF")
+                        # temp_id = t_name + "_id" + str(row_dict["_id"])
+                        temp_id = t_name + "_id"
+                        bff_dict.setdefault(temp_id, bff_info),
+                        inverted_index.update(tdict)
+                        if test_flag:
+                            filter_dict.setdefault(label, [])
+                            filter_dict[label].append(value)
                     else:
                         # For those attributes are not "_id"
                         label = attr + str(row_dict[attr])

@@ -269,10 +269,11 @@ class BFF(object):
     def __init__(self, hash_num=3, nonce=None):
         # Set default number of hash functions as 3 (i.e., 3-wise)
         self.hash_num = hash_num
-        if nonce is None:
-            self.nonce = str(gen_key(8))
-        else:
-            self.nonce = nonce
+        # if nonce is None:
+            # self.nonce = str(gen_key(8))
+        # else:
+            # self.nonce = nonce
+        self.nonce = str(gen_key(8))
 
     def __hashfunc__(self, key, segment_num, segment_range):
         pos_list = []
@@ -349,6 +350,7 @@ class BFF(object):
         label_num = len(temp_dict.keys())
         segment_range = math.ceil(4.8 * (label_num ** 0.58))
         segment_num = math.ceil(1.125 * label_num / segment_range)
+        # segment_num = math.ceil(1.5 * label_num / segment_range)
         if segment_num < self.hash_num:
             segment_num = self.hash_num
             segment_range = math.ceil(1.5 * label_num / segment_num)
